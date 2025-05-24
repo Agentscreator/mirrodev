@@ -15,7 +15,7 @@ export async function generateExplanation(
 ): Promise<string> {
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo", // Or your preferred model
+      model: "gpt-4o-mini", 
       messages: [
         {
           role: "system",
