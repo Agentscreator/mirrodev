@@ -16,6 +16,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Recipient ID required' }, { status: 400 });
     }
 
+    if (recipientId === session.user.id) {
+      return NextResponse.json({ error: 'Cannot create channel with yourself' }, { status: 400 });
+    }
+
     const channel = await createDirectChannel(session.user.id, recipientId);
     
     return NextResponse.json({ 

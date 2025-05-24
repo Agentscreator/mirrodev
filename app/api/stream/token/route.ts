@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     await serverClient.upsertUser({
       id: userId,
       name: session.user.username || session.user.name || session.user.email || 'User',
-      image: session.user.image,
+      image: session.user.image || undefined, // Convert null to undefined
     });
 
     // Return both token and API key for client initialization
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     await serverClient.upsertUser({
       id: session.user.id,
       name: session.user.username || session.user.name || session.user.email || 'User',
-      image: session.user.image,
+      image: session.user.image || undefined, // Convert null to undefined
     });
 
     return NextResponse.json({ 

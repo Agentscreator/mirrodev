@@ -1,159 +1,130 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
-import Link from "next/link"
-import { Input } from "@/components/ui/input"
-import { Search, MessageCircle, RefreshCw } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { Button } from "@/components/ui/button"
+import { ArrowLeft } from "lucide-react"
+import { Channel, ChannelHeader, MessageInput, MessageList, Thread, Window } from 'stream-chat-react'
+import { useStreamContext } from '@/components/providers/StreamProvider'
+import type { Channel as StreamChannel } from 'stream-chat'
+import 'stream-chat-react/dist/css/v2/index.css'
 
-interface ConversationUser {
+interface User {
   id: string
   username: string
   nickname?: string
   image?: string
 }
 
-interface Conversation {
-  id: string
-  user: ConversationUser
-  lastMessage?: string
-  timestamp?: string
-  unread: boolean
-}
-
-export default function MessagesPage() {
-  const { data: session, status } = useSession()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [conversations, setConversations] = useState<Conversation[]>([])
+export default function UserMessagePage() {
+  const params = useParams()
+  const router = useRouter()
+  const userId = params.userId as string
+  const [user, setUser] = useState<User | null>(null)
+  const [channel, setChannel] = useState<StreamChannel | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  // Fetch conversations from your API
-  const fetchConversations = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      
-      console.log('Fetching conversations...')
-      
-      const response = await fetch('/api/stream/conversations', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-      
-      console.log('Response status:', response.status)
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
-      }
-      
-      const data = await response.json()
-      console.log('Conversations data:', data)
-      
-      setConversations(data.conversations || [])
-    } catch (err) {
-      console.error('Error fetching conversations:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load conversations')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { client: streamClient, isReady } = useStreamContext()
 
   useEffect(() => {
-    // Only fetch when we have a session
-    if (status === 'authenticated' && session?.user?.id) {
-      fetchConversations()
-    } else if (status === 'unauthenticated') {
-      setError('You must be logged in to view messages')
-      setLoading(false)
+    const initializeChat = async () => {
+      if (!streamClient || !streamClient.userID || !userId || !isReady) {
+        setLoading(false)
+        setError('Chat not ready')
+        return
+      }
+
+      try {
+        setLoading(true)
+        setError(null)
+
+        // Fetch user information
+        const userResponse = await fetch(`/api/users/${userId}`)
+        if (userResponse.ok) {
+          const userData = await userResponse.json()
+          setUser({
+            id: userData.user.id,
+            username: userData.user.username,
+            nickname: userData.user.nickname,
+            image: userData.user.image || userData.user.profileImage
+          })
+        } else {
+          throw new Error('User not found')
+        }
+
+        // Create or get existing channel
+        const channelResponse = await fetch('/api/stream/channel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recipientId: userId }),
+        })
+
+        if (!channelResponse.ok) {
+          throw new Error('Failed to create channel')
+        }
+
+        const { channelId } = await channelResponse.json()
+
+        // Get the channel from Stream
+        const streamChannel = streamClient.channel('messaging', channelId)
+
+        // Watch the channel to subscribe to events
+        await streamChannel.watch()
+        setChannel(streamChannel)
+      } catch (err) {
+        console.error('Chat initialization error:', err)
+        setError(err instanceof Error ? err.message : 'Failed to load conversation')
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [session, status])
 
-  const filteredConversations = conversations.filter((convo) =>
-    convo.user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (convo.user.nickname && convo.user.nickname.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
+    initializeChat()
+  }, [userId, streamClient, isReady])
 
-  const formatTimestamp = (timestamp?: string) => {
-    if (!timestamp) return ""
-    
-    const date = new Date(timestamp)
-    const now = new Date()
-    const diffInHours = Math.abs(now.getTime() - date.getTime()) / (1000 * 60 * 60)
-    
-    if (diffInHours < 24) {
-      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    } else if (diffInHours < 168) { // 7 days
-      return date.toLocaleDateString([], { weekday: "short" })
-    } else {
-      return date.toLocaleDateString([], { month: "short", day: "numeric" })
-    }
-  }
-
-  if (status === 'loading' || loading) {
+  if (loading) {
     return (
-      <div className="flex h-[calc(100vh-5rem)] md:h-[calc(100vh-4rem)] flex-col messages-doodle-bg">
-        <div className="border-b border-blue-100/50 p-4">
-          <h1 className="mb-4 text-2xl font-bold text-blue-600">Messages</h1>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search conversations..."
-              className="pl-10 premium-input"
-              disabled
-            />
-          </div>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">
-              {status === 'loading' ? 'Loading session...' : 'Loading conversations...'}
-            </p>
-          </div>
+      <div className="flex h-[calc(100vh-5rem)] md:h-[calc(100vh-4rem)] items-center justify-center messages-doodle-bg">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading conversation...</p>
         </div>
       </div>
     )
   }
 
-  if (error) {
+  if (error || !channel) {
     return (
-      <div className="flex h-[calc(100vh-5rem)] md:h-[calc(100vh-4rem)] flex-col messages-doodle-bg">
-        <div className="border-b border-blue-100/50 p-4">
-          <h1 className="mb-4 text-2xl font-bold text-blue-600">Messages</h1>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center max-w-md">
-            <h2 className="text-xl font-semibold text-red-600 mb-2">Error</h2>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <button
-              onClick={() => fetchConversations()}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Try Again
-            </button>
-          </div>
+      <div className="flex h-[calc(100vh-5rem)] md:h-[calc(100vh-4rem)] items-center justify-center messages-doodle-bg">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-red-600 mb-2">
+            {error || 'Conversation not found'}
+          </h2>
+          <p className="text-gray-600 mb-4">Unable to load this conversation.</p>
+          <Button 
+            className="rounded-full" 
+            onClick={() => router.push('/authenticated/messages')}
+          >
+            Back to Messages
+          </Button>
         </div>
       </div>
     )
   }
 
-  if (status === 'unauthenticated') {
+  if (!user) {
     return (
-      <div className="flex h-[calc(100vh-5rem)] md:h-[calc(100vh-4rem)] flex-col messages-doodle-bg">
-        <div className="border-b border-blue-100/50 p-4">
-          <h1 className="mb-4 text-2xl font-bold text-blue-600">Messages</h1>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-xl font-semibold text-blue-600">Not Signed In</h2>
-            <p className="mt-2 text-gray-600">Please sign in to view your messages.</p>
-          </div>
+      <div className="flex h-[calc(100vh-5rem)] md:h-[calc(100vh-4rem)] items-center justify-center messages-doodle-bg">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-blue-600">User not found</h2>
+          <p className="mt-2 text-gray-600">This user doesn't exist or has been removed.</p>
+          <Button 
+            className="mt-4 rounded-full" 
+            onClick={() => router.push('/authenticated/messages')}
+          >
+            Back to Messages
+          </Button>
         </div>
       </div>
     )
@@ -161,83 +132,209 @@ export default function MessagesPage() {
 
   return (
     <div className="flex h-[calc(100vh-5rem)] md:h-[calc(100vh-4rem)] flex-col messages-doodle-bg">
-      {/* Header */}
-      <div className="border-b border-blue-100/50 p-4">
-        <h1 className="mb-4 text-2xl font-bold text-blue-600">Messages</h1>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search conversations..."
-            className="pl-10 premium-input"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+      {/* Custom Header */}
+      <div className="border-b glass-effect p-4 bg-white/80 backdrop-blur-sm">
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="rounded-full mr-1 hover:bg-blue-50" 
+            onClick={() => router.push('/authenticated/messages')}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="relative h-10 w-10 overflow-hidden rounded-full">
+            {user.image ? (
+              <Image
+                src={user.image}
+                alt={user.username}
+                fill
+                className="object-cover"
+                sizes="40px"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold">
+                {user.username[0]?.toUpperCase() || '?'}
+              </div>
+            )}
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold text-gray-900">
+              {user.nickname || user.username}
+            </h3>
+            <p className="text-sm text-gray-500">
+              {user.nickname ? `@${user.username}` : 'Online'}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Conversation List */}
-      <div className="flex-1 overflow-y-auto p-2 premium-scrollbar">
-        {filteredConversations.length > 0 ? (
-          <div className="space-y-2">
-            {filteredConversations.map((convo) => (
-              <Link href={`/authenticated/messages/${convo.user.id}`} key={convo.id} className="block">
-                <div className="cursor-pointer rounded-xl p-3 transition-colors hover:bg-blue-500/10">
-                  <div className="flex items-start gap-3">
-                    <div className="relative">
-                      <div className="relative h-12 w-12 overflow-hidden rounded-full premium-avatar">
-                        {convo.user.image ? (
-                          <Image
-                            src={convo.user.image}
-                            alt={convo.user.username}
-                            fill
-                            className="object-cover"
-                            sizes="48px"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-blue-500 flex items-center justify-center text-white font-semibold">
-                            {convo.user.username[0]?.toUpperCase() || '?'}
-                          </div>
-                        )}
-                      </div>
-                      {convo.unread && (
-                        <span className="absolute right-0 top-0 h-3 w-3 rounded-full bg-blue-500 blue-glow"></span>
-                      )}
-                    </div>
-                    <div className="flex-1 overflow-hidden">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-medium text-blue-600">
-                          {convo.user.nickname || convo.user.username}
-                        </h3>
-                        <span className="text-xs premium-text-muted">
-                          {formatTimestamp(convo.timestamp)}
-                        </span>
-                      </div>
-                      <p className="truncate text-sm premium-text-muted">
-                        {convo.lastMessage || "Start a new conversation"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-            <div className="mb-6 h-16 w-16 rounded-full bg-blue-100 flex items-center justify-center">
-              <MessageCircle className="h-8 w-8 text-blue-600" />
-            </div>
-            <h2 className="text-xl font-semibold text-blue-600">
-              {searchQuery ? "No conversations found" : "No messages yet"}
-            </h2>
-            <p className="mt-2 max-w-md text-gray-600">
-              {searchQuery 
-                ? "Try searching with a different term or start a new conversation from the Discover page."
-                : "Start connecting with people from the Discover page to begin conversations."
-              }
-            </p>
-          </div>
-        )}
+      {/* Stream Chat Integration */}
+      <div className="flex-1 flex stream-chat-custom">
+        <Channel channel={channel}>
+          <Window>
+            <MessageList />
+            <MessageInput />
+          </Window>
+          <Thread />
+        </Channel>
       </div>
+
+      <style jsx global>{`
+        .stream-chat-custom {
+          height: 100%;
+        }
+        
+        .str-chat {
+          height: 100%;
+        }
+        
+        .str-chat__main-panel {
+          background: transparent;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .str-chat__message-list {
+          background: transparent;
+          padding: 1rem;
+          flex: 1;
+          overflow-y: auto;
+        }
+        
+        .str-chat__message-simple {
+          margin-bottom: 1rem;
+        }
+        
+        .str-chat__message-simple__content {
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(59, 130, 246, 0.1);
+          border-radius: 1rem;
+          padding: 0.75rem 1rem;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .str-chat__message-simple--me .str-chat__message-simple__content {
+          background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+          color: white;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .str-chat__input {
+          background: rgba(255, 255, 255, 0.9);
+          backdrop-filter: blur(10px);
+          border-top: 1px solid rgba(59, 130, 246, 0.1);
+          padding: 1rem;
+        }
+        
+        .str-chat__input .rta {
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(59, 130, 246, 0.2);
+          border-radius: 1.5rem;
+          padding: 0.75rem 1rem;
+          min-height: 44px;
+        }
+        
+        .str-chat__input .rta textarea {
+          background: transparent;
+          border: none;
+          outline: none;
+          resize: none;
+        }
+        
+        .str-chat__send-button {
+          background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+          border-radius: 50%;
+          width: 2.5rem;
+          height: 2.5rem;
+          margin-left: 0.5rem;
+          border: none;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        
+        .str-chat__send-button:hover {
+          background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+          transform: scale(1.05);
+        }
+        
+        .str-chat__send-button svg {
+          color: white;
+        }
+        
+        /* Message bubbles styling */
+        .str-chat__message-text {
+          line-height: 1.4;
+        }
+        
+        .str-chat__message-metadata {
+          font-size: 0.75rem;
+          color: rgba(0, 0, 0, 0.5);
+          margin-top: 0.25rem;
+        }
+        
+        .str-chat__message-simple--me .str-chat__message-metadata {
+          color: rgba(255, 255, 255, 0.7);
+        }
+        
+        /* Avatar styling */
+        .str-chat__avatar {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          margin-right: 0.5rem;
+        }
+        
+        /* Thread styling */
+        .str-chat__thread {
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(10px);
+          border-left: 1px solid rgba(59, 130, 246, 0.1);
+        }
+        
+        /* Scrollbar styling */
+        .str-chat__message-list::-webkit-scrollbar {
+          width: 6px;
+        }
+        
+        .str-chat__message-list::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        
+        .str-chat__message-list::-webkit-scrollbar-thumb {
+          background: rgba(59, 130, 246, 0.3);
+          border-radius: 3px;
+        }
+        
+        .str-chat__message-list::-webkit-scrollbar-thumb:hover {
+          background: rgba(59, 130, 246, 0.5);
+        }
+        
+        /* Message reactions */
+        .str-chat__reaction-list {
+          background: rgba(255, 255, 255, 0.9);
+          backdrop-filter: blur(10px);
+          border-radius: 1rem;
+          padding: 0.25rem;
+        }
+        
+        /* Message status indicators */
+        .str-chat__message-status {
+          font-size: 0.75rem;
+          color: rgba(0, 0, 0, 0.4);
+        }
+        
+        /* Loading indicator */
+        .str-chat__loading-indicator {
+          background: rgba(255, 255, 255, 0.9);
+          backdrop-filter: blur(10px);
+          border-radius: 0.5rem;
+          padding: 0.5rem;
+        }
+      `}</style>
     </div>
   )
 }

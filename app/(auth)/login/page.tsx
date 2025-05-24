@@ -32,7 +32,7 @@ export default function LoginPage() {
     try {
       // Detect if input is email or username
       const isEmail = formData.identifier.includes("@")
-      
+     
       const result = await signIn("credentials", {
         [isEmail ? "email" : "username"]: formData.identifier,
         password: formData.password,
@@ -41,7 +41,6 @@ export default function LoginPage() {
 
       if (result?.error) {
         setError("Invalid email/username or password")
-        setLoading(false)
       } else if (result?.ok) {
         router.push("/discover")
         router.refresh()
@@ -49,6 +48,7 @@ export default function LoginPage() {
     } catch (error) {
       console.error("Login error:", error)
       setError("An error occurred during login")
+    } finally {
       setLoading(false)
     }
   }
@@ -69,7 +69,11 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+            {error && (
+              <div className="rounded-md bg-red-50 p-3 border border-red-200">
+                <p className="text-sm text-red-600 text-center">{error}</p>
+              </div>
+            )}
             <div className="space-y-2">
               <Input
                 name="identifier"
@@ -79,6 +83,7 @@ export default function LoginPage() {
                 onChange={handleChange}
                 required
                 className="premium-input"
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -90,11 +95,12 @@ export default function LoginPage() {
                 onChange={handleChange}
                 required
                 className="premium-input"
+                disabled={loading}
               />
               <div className="text-right">
                 <Link
                   href="/auth/reset-password"
-                  className="text-xs premium-text-muted hover:text-blue-600 dark:hover:text-blue-400"
+                  className="text-xs premium-text-muted hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                 >
                   Forgot password?
                 </Link>

@@ -18,9 +18,10 @@ interface UserCardProps {
   }
   onMessage?: () => void
   onViewProfile?: () => void
+  isMessaging?: boolean // Added this prop to fix the TypeScript error
 }
 
-export function UserCard({ user, onMessage, onViewProfile }: UserCardProps) {
+export function UserCard({ user, onMessage, onViewProfile, isMessaging = false }: UserCardProps) {
   const usernameInitial = user.username.charAt(0).toUpperCase()
 
   const handleMessage = () => {
@@ -78,9 +79,14 @@ export function UserCard({ user, onMessage, onViewProfile }: UserCardProps) {
             <div className="mt-4 flex justify-center sm:justify-end items-center gap-2">
               <Button 
                 onClick={handleMessage}
-                className="rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1"
+                disabled={isMessaging}
+                className="rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1 disabled:opacity-50"
               >
-                <MessageSquare className="h-4 w-4" />
+                {isMessaging ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <MessageSquare className="h-4 w-4" />
+                )}
                 <span>Message</span>
               </Button>
               <Button

@@ -11,6 +11,8 @@ import { fetchRecommendations, generateExplanation } from "@/src/lib/apiServices
 import type { RecommendedUser as ApiRecommendedUser } from "@/src/lib/apiServices"
 import { useRouter } from "next/navigation"
 import { debounce } from "lodash"
+import { useStreamContext } from "@/components/providers/StreamProvider"
+import { toast } from "sonner" // Add this for notifications
 
 // Define search user type
 interface SearchUser {
@@ -30,7 +32,9 @@ export default function DiscoverPage() {
   const [hasMore, setHasMore] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [showSearchResults, setShowSearchResults] = useState(false)
+  const [messagingUser, setMessagingUser] = useState<string | null>(null)
   const router = useRouter()
+  const { client: streamClient, isReady } = useStreamContext()
 
   // Helper function to convert API user to local user type
   const convertApiUserToLocalUser = (apiUser: ApiRecommendedUser): RecommendedUser => ({
@@ -100,20 +104,36 @@ export default function DiscoverPage() {
     router.push(`/authenticated/profile/${userId}`)
   }
 
-  // Start conversation with user
+  // Start conversation with user - FIXED
   const handleMessage = async (userId: string) => {
+    if (!streamClient || !isReady) {
+      toast.error("Chat is not ready. Please wait a moment and try again.")
+      return
+    }
+
+    setMessagingUser(userId)
+
     try {
+      // Create/get channel via API
       const response = await fetch('/api/stream/channel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ recipientId: userId }),
       })
       
-      if (response.ok) {
-        router.push(`/authenticated/messages/${userId}`)
+      if (!response.ok) {
+        throw new Error('Failed to create channel')
       }
+
+      const { channelId } = await response.json()
+
+      // Navigate to the message page
+      router.push(`/authenticated/messages/${userId}`)
     } catch (error) {
       console.error("Error creating channel:", error)
+      toast.error("Failed to start conversation. Please try again.")
+    } finally {
+      setMessagingUser(null)
     }
   }
 
@@ -244,8 +264,13 @@ export default function DiscoverPage() {
                           size="sm"
                           onClick={() => handleMessage(user.id)}
                           className="rounded-full bg-blue-600 hover:bg-blue-700 text-white"
+                          disabled={messagingUser === user.id || !isReady}
                         >
-                          <MessageCircle className="h-3 w-3 mr-1" />
+                          {messagingUser === user.id ? (
+                            <div className="h-3 w-3 mr-1 animate-spin rounded-full border-b border-white"></div>
+                          ) : (
+                            <MessageCircle className="h-3 w-3 mr-1" />
+                          )}
                           Message
                         </Button>
                       </div>
@@ -278,6 +303,7 @@ export default function DiscoverPage() {
                   }}
                   onMessage={() => handleMessage(user.id.toString())}
                   onViewProfile={() => handleViewProfile(user.id.toString())}
+                  isMessaging={messagingUser === user.id.toString()}
                 />
               ))
             ) : (
