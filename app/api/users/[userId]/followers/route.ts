@@ -1,9 +1,9 @@
 // app/api/users/[userId]/followers/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/src/lib/auth';
-import { db } from '@/src/db'; // Your Drizzle database instance
-import { followersTable, usersTable } from '@/src/db/schema'; // Your schema
-import { eq, and } from 'drizzle-orm';
+import { db } from '@/src/db';
+import { followersTable, usersTable } from '@/src/db/schema';
+import { eq, and, inArray } from 'drizzle-orm';
 
 export async function GET(
   request: NextRequest,
@@ -16,7 +16,6 @@ export async function GET(
     }
 
     const { userId } = params;
-    
     const followers = await getFollowers(userId, session.user.id);
     
     return NextResponse.json({ users: followers });
@@ -44,27 +43,27 @@ async function getFollowers(userId: string, currentUserId: string) {
     .innerJoin(usersTable, eq(followersTable.followerId, usersTable.id))
     .where(eq(followersTable.followingId, userId));
 
+  if (followersQuery.length === 0) {
+    return [];
+  }
+
   // Get who the current user is following among these followers
-  const followerIds = followersQuery.map((f: any) => f.id);
-  const currentUserFollowing = followerIds.length > 0 
-    ? await db
-        .select({ followingId: followersTable.followingId })
-        .from(followersTable)
-        .where(
-          and(
-            eq(followersTable.followerId, currentUserId),
-            // Use in() for multiple values or individual eq() checks
-            followerIds.length === 1 
-              ? eq(followersTable.followingId, followerIds[0])
-              : eq(followersTable.followingId, followerIds[0]) // You might need to use inArray here
-          )
-        )
-    : [];
+  const followerIds = followersQuery.map(f => f.id);
+  const currentUserFollowing = await db
+    .select({ followingId: followersTable.followingId })
+    .from(followersTable)
+    .where(
+      and(
+        eq(followersTable.followerId, currentUserId),
+        inArray(followersTable.followingId, followerIds)
+      )
+    );
 
-  const followingSet = new Set(currentUserFollowing.map((f: any) => f.followingId));
+  const followingSet = new Set(currentUserFollowing.map(f => f.followingId));
 
-  return followersQuery.map((follower: any) => ({
+  return followersQuery.map(follower => ({
     ...follower,
     isFollowing: followingSet.has(follower.id)
   }));
 }
+

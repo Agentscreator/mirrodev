@@ -1,100 +1,102 @@
 // components/providers/StreamProvider.tsx
-"use client"
+"use client";
 
-import { useEffect, useState, createContext, useContext } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { StreamChat } from 'stream-chat';
-import { Chat } from 'stream-chat-react';
-import { useSession } from 'next-auth/react'; // Adjust based on your auth
-import { streamClient } from '@/src/lib/stream';
+import { useSession } from 'next-auth/react';
 
 interface StreamContextValue {
   client: StreamChat | null;
   isReady: boolean;
+  error: string | null;
 }
 
 const StreamContext = createContext<StreamContextValue>({
   client: null,
   isReady: false,
+  error: null,
 });
 
-export const useStreamContext = () => useContext(StreamContext);
+export const useStreamContext = () => {
+  const context = useContext(StreamContext);
+  if (!context) {
+    throw new Error('useStreamContext must be used within a StreamProvider');
+  }
+  return context;
+};
 
 interface StreamProviderProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export function StreamProvider({ children }: StreamProviderProps) {
-  const { data: session } = useSession(); // Adjust based on your auth
+  const [client, setClient] = useState<StreamChat | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { data: session, status } = useSession();
 
   useEffect(() => {
-    const connectUser = async () => {
-      if (!session?.user) return;
+    if (status === 'loading') return;
+    
+    if (!session?.user) {
+      setClient(null);
+      setIsReady(false);
+      return;
+    }
 
+    const initializeStream = async () => {
       try {
-        // Check if user is already connected
-        if (streamClient.userID) {
-          setIsReady(true);
-          return;
-        }
+        setError(null);
+        
+        const streamClient = StreamChat.getInstance(
+          process.env.NEXT_PUBLIC_STREAM_API_KEY!
+        );
 
-        // Get Stream token from your API
-        const response = await fetch('/api/stream/token', {
+        // Get token from our API
+        const tokenResponse = await fetch('/api/stream/token', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: session.user.id }),
         });
 
-        if (!response.ok) {
+        if (!tokenResponse.ok) {
           throw new Error('Failed to get Stream token');
         }
 
-        const { token } = await response.json();
+        const { token } = await tokenResponse.json();
 
         // Connect user to Stream
         await streamClient.connectUser(
           {
             id: session.user.id,
-            name: session.user.name || session.user.username,
-            image: session.user.image || undefined, // Convert null to undefined
+            name: session.user.username || session.user.name || 'User',
+            image: session.user.image || undefined,
           },
           token
         );
 
+        setClient(streamClient);
         setIsReady(true);
-      } catch (error) {
-        console.error('Stream connection error:', error);
+      } catch (err) {
+        console.error('Stream initialization error:', err);
+        setError(err instanceof Error ? err.message : 'Failed to initialize chat');
+        setIsReady(false);
       }
     };
 
-    connectUser();
+    initializeStream();
 
-    // Cleanup on unmount
+    // Cleanup function
     return () => {
-      if (streamClient.userID) {
-        streamClient.disconnectUser();
+      if (client) {
+        client.disconnectUser();
+        setClient(null);
+        setIsReady(false);
       }
     };
-  }, [session]);
-
-  const contextValue: StreamContextValue = {
-    client: streamClient,
-    isReady,
-  };
-
-  if (!isReady) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+  }, [session, status]);
 
   return (
-    <StreamContext.Provider value={contextValue}>
-      <Chat client={streamClient}>
-        {children}
-      </Chat>
+    <StreamContext.Provider value={{ client, isReady, error }}>
+      {children}
     </StreamContext.Provider>
   );
 }

@@ -1,31 +1,35 @@
 // src/lib/stream.ts
 import { StreamChat } from 'stream-chat';
 
-// Initialize Stream Chat client
-export const streamClient = StreamChat.getInstance(process.env.NEXT_PUBLIC_STREAM_API_KEY!);
+// Create a singleton instance
+let clientInstance: StreamChat | null = null;
 
-// Helper function to connect user to Stream
-export const connectUserToStream = async (userId: string, username: string, token: string, image?: string) => {
-  try {
-    const user = {
-      id: userId,
-      name: username,
-      image: image || undefined,
-    };
-
-    await streamClient.connectUser(user, token);
-    return true;
-  } catch (error) {
-    console.error('Failed to connect user to Stream:', error);
-    return false;
+export const getStreamClient = () => {
+  if (!clientInstance) {
+    clientInstance = StreamChat.getInstance(
+      process.env.NEXT_PUBLIC_STREAM_API_KEY!
+    );
   }
+  return clientInstance;
 };
 
-// Helper function to disconnect user from Stream
-export const disconnectUserFromStream = async () => {
-  try {
-    await streamClient.disconnectUser();
-  } catch (error) {
-    console.error('Failed to disconnect user from Stream:', error);
+// For backward compatibility - use a different name to avoid redeclaration
+export const streamClient = getStreamClient();
+
+// Alternative approach: Create a class-based singleton
+export class StreamClientManager {
+  private static instance: StreamChat | null = null;
+
+  static getInstance(): StreamChat {
+    if (!StreamClientManager.instance) {
+      StreamClientManager.instance = StreamChat.getInstance(
+        process.env.NEXT_PUBLIC_STREAM_API_KEY!
+      );
+    }
+    return StreamClientManager.instance;
   }
-};
+
+  static reset() {
+    StreamClientManager.instance = null;
+  }
+}
