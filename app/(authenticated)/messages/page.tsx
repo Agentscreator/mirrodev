@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import { Channel, MessageInput, MessageList, Thread, Window } from "stream-chat-react"
-import { useStreamContext } from "@/components/providers/StreamProvider"
+import { StreamChat } from "stream-chat"
 import type { Channel as StreamChannel } from "stream-chat"
 import "stream-chat-react/dist/css/v2/index.css"
 
@@ -21,20 +22,18 @@ interface User {
 export default function UserMessagePage() {
   const params = useParams()
   const router = useRouter()
+  const { data: session } = useSession()
   const userId = params.userId as string
+  
   const [user, setUser] = useState<User | null>(null)
   const [channel, setChannel] = useState<StreamChannel | null>(null)
+  const [streamClient, setStreamClient] = useState<StreamChat | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { client: streamClient, isReady, error: streamError } = useStreamContext()
 
   useEffect(() => {
     const initializeChat = async () => {
-      // Add better checks for Stream readiness
-      if (!streamClient || !isReady || !userId || streamError) {
-        if (streamError) {
-          setError("Chat service unavailable")
-        }
+      if (!session?.user?.id || !userId) {
         return
       }
 
@@ -42,7 +41,7 @@ export default function UserMessagePage() {
         setLoading(true)
         setError(null)
 
-        // Fetch user information first
+        // 1. Fetch user information
         const userResponse = await fetch(`/api/users/${userId}`)
         if (!userResponse.ok) {
           if (userResponse.status === 404) {
@@ -60,7 +59,36 @@ export default function UserMessagePage() {
           image: userData.user.image || userData.user.profileImage,
         })
 
-        // Create or get existing channel via API
+        // 2. Get Stream API key and token
+        const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY
+        if (!apiKey) {
+          throw new Error("Stream API key not found")
+        }
+
+        const tokenResponse = await fetch("/api/stream/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        })
+
+        if (!tokenResponse.ok) {
+          throw new Error("Failed to get Stream token")
+        }
+
+        const { token } = await tokenResponse.json()
+
+        // 3. Initialize Stream client and connect user
+        const client = StreamChat.getInstance(apiKey)
+        
+        const streamUser = {
+          id: session.user.id,
+          name: session.user.name || session.user.email || session.user.id,
+          image: session.user.image || undefined,
+        }
+
+        await client.connectUser(streamUser, token)
+        setStreamClient(client)
+
+        // 4. Create/get channel via API
         const channelResponse = await fetch("/api/stream/channel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -73,38 +101,15 @@ export default function UserMessagePage() {
         }
 
         const { channelId } = await channelResponse.json()
-
-        // Ensure we're using the exact channel ID format from the server
-        // The server should return the full channel ID (e.g., "dm_userA_userB")
         console.log("Using channel ID from server:", channelId)
 
-        // Get the channel from Stream client with retry logic
-        let retries = 3
-        let streamChannel = null
-
-        while (retries > 0 && !streamChannel) {
-          try {
-            // Use the exact channelId returned from the API
-            streamChannel = streamClient.channel("messaging", channelId)
-            await streamChannel.watch()
-            console.log("Successfully connected to channel:", channelId)
-            break
-          } catch (channelError) {
-            console.warn(`Channel watch attempt failed for ${channelId}, retries left: ${retries - 1}`, channelError)
-            retries--
-            if (retries === 0) {
-              throw channelError
-            }
-            // Wait a bit before retrying
-            await new Promise((resolve) => setTimeout(resolve, 1000))
-          }
-        }
-
-        if (!streamChannel) {
-          throw new Error("Failed to connect to channel after retries")
-        }
-
+        // 5. Watch the channel
+        const streamChannel = client.channel("messaging", channelId)
+        await streamChannel.watch()
+        console.log("Successfully connected to channel:", channelId)
+        
         setChannel(streamChannel)
+
       } catch (err) {
         console.error("Chat initialization error:", err)
         setError(err instanceof Error ? err.message : "Failed to load conversation")
@@ -113,14 +118,15 @@ export default function UserMessagePage() {
       }
     }
 
-    // Only initialize when we have all required data
-    if (streamClient && isReady && userId && !streamError) {
-      initializeChat()
-    } else if (streamError) {
-      setError("Chat service unavailable")
-      setLoading(false)
+    initializeChat()
+
+    // Cleanup function
+    return () => {
+      if (streamClient) {
+        streamClient.disconnectUser().catch(console.warn)
+      }
     }
-  }, [streamClient, isReady, userId, streamError])
+  }, [session?.user?.id, userId])
 
   if (loading) {
     return (
@@ -154,7 +160,7 @@ export default function UserMessagePage() {
     )
   }
 
-  if (!channel || !user) {
+  if (!channel || !user || !streamClient) {
     return (
       <div className="flex h-[calc(100vh-5rem)] md:h-[calc(100vh-4rem)] items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50">
         <div className="text-center">
