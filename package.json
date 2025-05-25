@@ -14,7 +14,8 @@
     "seed:tags": "tsx src/db/seedTags.ts",
     "seed:thoughts": "tsx src/db/seedThoughts.ts",
     "seed:user-tags": "tsx src/db/seedUserTags.ts",
-    "seed": "yarn seed:users && yarn seed:tags && yarn seed:thoughts && yarn seed:user-tags"
+    "seed": "yarn seed:users && yarn seed:tags && yarn seed:thoughts && yarn seed:user-tags",
+    "tailwind": "tailwindcss"
   },
   "dependencies": {
     "@faker-js/faker": "^9.8.0",
