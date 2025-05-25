@@ -151,7 +151,8 @@ export default function UserMessagePage() {
           </p>
           <Button
             className="rounded-full bg-blue-600 hover:bg-blue-700"
-            onClick={() => router.push("/authenticated/messages")}
+            onClick={() => router.push("/messages")}
+
           >
             Back to Messages
           </Button>
@@ -180,7 +181,8 @@ export default function UserMessagePage() {
             variant="ghost"
             size="icon"
             className="rounded-full mr-1 hover:bg-blue-100"
-            onClick={() => router.push("/authenticated/messages")}
+            onClick={() => router.push("/messages")}
+
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>

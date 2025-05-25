@@ -148,7 +148,7 @@ const searchUsers = async (query: string) => {
       }
 
       // Navigate to the message page immediately
-      router.push(`/authenticated/messages/${userId}`)
+      router.push(`/messages/${userId}`)
     } catch (error) {
       console.error("Error creating channel:", error)
       toast({

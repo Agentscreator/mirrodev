@@ -559,13 +559,13 @@ export default function ProfilePage() {
 
       if (response.ok) {
         const data = await response.json()
-        router.push(`/authenticated/messages/${user.id}`)
+        router.push(`/messages/${user.id}`)
       } else {
-        router.push(`/authenticated/messages/${user.id}`)
+        router.push(`/messages/${user.id}`)
       }
     } catch (error) {
       console.error("Error creating channel:", error)
-      router.push(`/authenticated/messages/${user.id}`)
+      router.push(`/messages/${user.id}`)
     }
   }
 
@@ -926,7 +926,7 @@ export default function ProfilePage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => router.push(`/authenticated/profile/${follower.id}`)}
+                    onClick={() => router.push(`/profile/${follower.id}`)}
                     className="rounded-full"
                   >
                     View
@@ -966,7 +966,7 @@ export default function ProfilePage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => router.push(`/authenticated/profile/${followedUser.id}`)}
+                    onClick={() => router.push(`/profile/${followedUser.id}`)}
                     className="rounded-full"
                   >
                     View
