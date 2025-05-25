@@ -9,7 +9,7 @@ let serverClient: StreamChat | null = null
 
 const getServerClient = () => {
   if (!serverClient) {
-    const apiKey = process.env.STREAM_API_KEY  // ✅ Fixed: Use non-public env var
+    const apiKey = process.env.STREAM_API_KEY
     const secret = process.env.STREAM_SECRET_KEY
 
     if (!apiKey || !secret) {
@@ -48,38 +48,26 @@ export async function POST(request: NextRequest) {
     const currentUserId = session.user.id
     const client = getServerClient()
 
-    // ✅ Fixed: Use consistent channel ID format
+    // Use consistent channel ID format
     const members = [currentUserId, recipientId].sort()
-    const channelId = `dm_${members.join("_")}`  // Server uses dm_userA_userB
+    const channelId = `dm_${members.join("_")}`
 
-    try {
-      const existingChannel = client.channel("messaging", channelId)
-      await existingChannel.query()
+    // Create or get existing channel - Stream handles duplicates gracefully
+    const channel = client.channel("messaging", channelId, {
+      members: members,
+      created_by_id: currentUserId,
+    })
 
-      return NextResponse.json({
-        channelId,
-        success: true,
-        existed: true,
-      })
-    } catch (channelError) {
-      try {
-        const newChannel = client.channel("messaging", channelId, {
-          members: members,
-          created_by_id: currentUserId,
-        })
+    // This will create if it doesn't exist, or return existing if it does
+    const channelState = await channel.create()
+    const existed = channelState.channel.created_at !== channelState.channel.updated_at
 
-        await newChannel.create()
+    return NextResponse.json({
+      channelId,
+      success: true,
+      existed,
+    })
 
-        return NextResponse.json({
-          channelId,
-          success: true,
-          existed: false,
-        })
-      } catch (createError) {
-        console.error("Channel creation failed:", createError)
-        throw createError
-      }
-    }
   } catch (error) {
     console.error("Stream channel API error:", error)
 
