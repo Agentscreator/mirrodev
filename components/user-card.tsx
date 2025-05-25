@@ -7,6 +7,8 @@ import { MessageSquare, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AnimatedText } from "@/components/animated-text"
 import { Badge } from "@/components/ui/badge"
+import { useChatContext } from 'stream-chat-react'
+import { useState } from 'react'
 
 interface UserCardProps {
   user: {
@@ -16,17 +18,53 @@ interface UserCardProps {
     reason?: string
     tags: string[]
   }
-  onMessage?: () => void
+  onMessage?: (channelId?: string) => void
   onViewProfile?: () => void
-  isMessaging?: boolean // Added this prop to fix the TypeScript error
+  isMessaging?: boolean
 }
 
 export function UserCard({ user, onMessage, onViewProfile, isMessaging = false }: UserCardProps) {
+  const { client } = useChatContext()
+  const [isCreatingDM, setIsCreatingDM] = useState(false)
   const usernameInitial = user.username.charAt(0).toUpperCase()
 
-  const handleMessage = () => {
-    if (onMessage) {
-      onMessage()
+  const handleMessage = async () => {
+    if (!client || isCreatingDM) return
+    
+    setIsCreatingDM(true)
+    
+    try {
+      // Get the current user
+      const currentUser = client.userID
+      if (!currentUser) {
+        console.error('No current user found')
+        return
+      }
+
+      // Create or get existing DM channel
+      // Generate a consistent channel ID for DM between these two users
+      const channelId = [currentUser, user.id.toString()].sort().join('-')
+      
+      const channel = client.channel('messaging', channelId, {
+        members: [currentUser, user.id.toString()],
+        // Optional: Add custom data
+        created_by_id: currentUser,
+      })
+
+      // Watch the channel to make it active
+      await channel.watch()
+
+      // Call the onMessage callback with the channel ID
+      if (onMessage) {
+        onMessage(channel.id)
+      }
+
+      console.log('DM channel created/retrieved:', channel.id)
+      
+    } catch (error) {
+      console.error('Error creating DM channel:', error)
+    } finally {
+      setIsCreatingDM(false)
     }
   }
 
@@ -35,6 +73,8 @@ export function UserCard({ user, onMessage, onViewProfile, isMessaging = false }
       onViewProfile()
     }
   }
+
+  const isButtonDisabled = isMessaging || isCreatingDM
 
   return (
     <Card className="border border-blue-100 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1">
@@ -79,15 +119,15 @@ export function UserCard({ user, onMessage, onViewProfile, isMessaging = false }
             <div className="mt-4 flex justify-center sm:justify-end items-center gap-2">
               <Button 
                 onClick={handleMessage}
-                disabled={isMessaging}
+                disabled={isButtonDisabled}
                 className="rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1 disabled:opacity-50"
               >
-                {isMessaging ? (
+                {isButtonDisabled ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 ) : (
                   <MessageSquare className="h-4 w-4" />
                 )}
-                <span>Message</span>
+                <span>{isCreatingDM ? 'Creating...' : 'Message'}</span>
               </Button>
               <Button
                 onClick={handleViewProfile}
