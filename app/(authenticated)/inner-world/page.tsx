@@ -18,8 +18,8 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 
-const MAX_TOTAL_CHARS = 20000
-const MAX_THOUGHT_CHARS = 2500
+const MAX_TOTAL_CHARS = 8000
+const MAX_THOUGHT_CHARS = 1000
 
 interface Thought {
   id: number
