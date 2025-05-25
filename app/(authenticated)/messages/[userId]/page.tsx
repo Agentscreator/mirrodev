@@ -19,7 +19,7 @@ interface User {
   profileImage?: string
 }
 
-export default function UserMessagePage() {
+export default function SingleConversationPage() {
   const params = useParams()
   const router = useRouter()
   const userId = params.userId as string
@@ -74,15 +74,13 @@ export default function UserMessagePage() {
 
         const { channelId } = await channelResponse.json()
 
-        // ✅ Fixed: Use the SAME channel ID format as server
-        // Server creates: dm_userA_userB
-        // Client must connect to: dm_userA_userB (not userA-userB)
+        // Connect to the channel with retry logic
         let retries = 3
         let streamChannel = null
 
         while (retries > 0 && !streamChannel) {
           try {
-            streamChannel = streamClient.channel("messaging", channelId)  // Use channelId from server
+            streamChannel = streamClient.channel("messaging", channelId)
             await streamChannel.watch()
             break
           } catch (channelError) {
@@ -136,7 +134,6 @@ export default function UserMessagePage() {
           <Button
             className="rounded-full bg-blue-600 hover:bg-blue-700"
             onClick={() => router.push("/messages")}
-
           >
             Back to Messages
           </Button>
@@ -166,7 +163,6 @@ export default function UserMessagePage() {
             size="icon"
             className="rounded-full mr-1 hover:bg-blue-100"
             onClick={() => router.push("/messages")}
-
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
