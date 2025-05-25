@@ -1,3 +1,4 @@
+// app/api/stream/channel/route.ts
 import { type NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/src/lib/auth"
@@ -8,7 +9,7 @@ let serverClient: StreamChat | null = null
 
 const getServerClient = () => {
   if (!serverClient) {
-    const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY
+    const apiKey = process.env.STREAM_API_KEY  // ✅ Fixed: Use non-public env var
     const secret = process.env.STREAM_SECRET_KEY
 
     if (!apiKey || !secret) {
@@ -22,44 +23,36 @@ const getServerClient = () => {
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify authentication
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Parse request body
     const body = await request.json()
     const { recipientId } = body
 
     if (!recipientId || typeof recipientId !== "string") {
       return NextResponse.json(
-        {
-          error: "Valid recipient ID is required",
-        },
-        { status: 400 },
+        { error: "Valid recipient ID is required" },
+        { status: 400 }
       )
     }
 
-    // Prevent self-messaging
     if (recipientId === session.user.id) {
       return NextResponse.json(
-        {
-          error: "Cannot create channel with yourself",
-        },
-        { status: 400 },
+        { error: "Cannot create channel with yourself" },
+        { status: 400 }
       )
     }
 
     const currentUserId = session.user.id
     const client = getServerClient()
 
-    // Create consistent channel ID
+    // ✅ Fixed: Use consistent channel ID format
     const members = [currentUserId, recipientId].sort()
-    const channelId = `dm_${members.join("_")}`
+    const channelId = `dm_${members.join("_")}`  // Server uses dm_userA_userB
 
     try {
-      // Try to get existing channel first
       const existingChannel = client.channel("messaging", channelId)
       await existingChannel.query()
 
@@ -69,7 +62,6 @@ export async function POST(request: NextRequest) {
         existed: true,
       })
     } catch (channelError) {
-      // Channel doesn't exist, create new one
       try {
         const newChannel = client.channel("messaging", channelId, {
           members: members,
@@ -91,7 +83,6 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Stream channel API error:", error)
 
-    // Provide more specific error messages
     let errorMessage = "Failed to create channel"
     let statusCode = 500
 
@@ -108,24 +99,5 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ error: errorMessage }, { status: statusCode })
-  }
-}
-
-// Health check endpoint
-export async function GET() {
-  try {
-    const client = getServerClient()
-    return NextResponse.json({
-      status: "healthy",
-      streamConnected: !!client,
-    })
-  } catch (error) {
-    return NextResponse.json(
-      {
-        status: "unhealthy",
-        error: "Stream client configuration error",
-      },
-      { status: 500 },
-    )
   }
 }
