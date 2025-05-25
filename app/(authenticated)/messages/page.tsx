@@ -74,17 +74,23 @@ export default function UserMessagePage() {
 
         const { channelId } = await channelResponse.json()
 
+        // Ensure we're using the exact channel ID format from the server
+        // The server should return the full channel ID (e.g., "dm_userA_userB")
+        console.log("Using channel ID from server:", channelId)
+
         // Get the channel from Stream client with retry logic
         let retries = 3
         let streamChannel = null
 
         while (retries > 0 && !streamChannel) {
           try {
+            // Use the exact channelId returned from the API
             streamChannel = streamClient.channel("messaging", channelId)
             await streamChannel.watch()
+            console.log("Successfully connected to channel:", channelId)
             break
           } catch (channelError) {
-            console.warn(`Channel watch attempt failed, retries left: ${retries - 1}`, channelError)
+            console.warn(`Channel watch attempt failed for ${channelId}, retries left: ${retries - 1}`, channelError)
             retries--
             if (retries === 0) {
               throw channelError
@@ -92,6 +98,10 @@ export default function UserMessagePage() {
             // Wait a bit before retrying
             await new Promise((resolve) => setTimeout(resolve, 1000))
           }
+        }
+
+        if (!streamChannel) {
+          throw new Error("Failed to connect to channel after retries")
         }
 
         setChannel(streamChannel)
