@@ -68,8 +68,7 @@
   }
 }
 
-/* Add this to your existing CSS file */
-
+/* Animations */
 .typing-cursor::after {
   content: "|";
   animation: blink 1s step-end infinite;
@@ -87,8 +86,6 @@
   }
 }
 
-/* Add this to the existing CSS file, near the other animations */
-
 @keyframes rotate {
   from {
     stroke-dashoffset: 0;
@@ -103,7 +100,6 @@
   transform-origin: center;
 }
 
-/* Add fade-in animations */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -119,6 +115,31 @@
   animation: fadeIn 0.5s ease-out forwards;
 }
 
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Premium border with cross-browser mask support */
 .premium-border {
   position: relative;
   border-radius: 0.75rem;
@@ -132,13 +153,16 @@
   padding: 1px;
   border-radius: inherit;
   background: linear-gradient(to right, rgba(37, 99, 235, 0.5), rgba(96, 165, 250, 0.5));
+  /* Standard mask property */
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  /* Webkit fallback */
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
-  mask-composite: exclude;
   pointer-events: none;
 }
 
-/* Update these styles to ensure proper light/dark mode support */
+/* Premium UI components */
 .premium-card {
   @apply bg-white backdrop-blur-md border border-blue-100 shadow-sm transition-all duration-300;
   border-radius: 0.75rem;
@@ -184,6 +208,7 @@
   background-size: 60px 60px;
 }
 
+/* Image upload styles */
 .image-upload-preview {
   position: relative;
   border-radius: 0.75rem;
@@ -216,6 +241,7 @@
   background: rgba(0, 0, 0, 0.7);
 }
 
+/* Gradient animations */
 .blue-gradient {
   @apply bg-blue-gradient;
   background-size: 200% 200%;
@@ -228,23 +254,7 @@
   animation: gradient 15s ease infinite;
 }
 
-@keyframes gradient {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-/* Premium UI elements */
-.premium-input {
-  @apply bg-white border-blue-200 rounded-full focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50;
-}
-
+/* Premium dropdown components */
 .premium-dropdown {
   @apply rounded-xl shadow-premium overflow-hidden border border-border/50 bg-card/90 backdrop-blur-md;
 }
@@ -325,10 +335,6 @@
   @apply bg-card/90 backdrop-blur-md border border-border/50 rounded-xl shadow-premium;
 }
 
-.premium-card-hover {
-  @apply hover:-translate-y-1 hover:shadow-md;
-}
-
 .premium-icon {
   @apply text-blue-500;
 }
@@ -345,18 +351,11 @@
   @apply font-medium text-muted-foreground;
 }
 
-.premium-text {
-  @apply text-gray-800;
-}
-
-.premium-text-muted {
-  @apply text-gray-600;
-}
-
 .premium-divider {
   @apply border-border/50;
 }
 
+/* Custom scrollbar */
 .premium-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(37, 99, 235, 0.3) transparent;
@@ -380,7 +379,7 @@
   background-color: rgba(37, 99, 235, 0.5);
 }
 
-/* Messages doodle background */
+/* Messages background with doodles */
 .messages-doodle-bg {
   position: relative;
   background-color: rgba(249, 250, 251, 0.8);
@@ -400,25 +399,11 @@
   pointer-events: none;
 }
 
-/* Update the tag gradient styles to use lighter colors */
-
-/* Tag gradients and animations */
+/* Tag styles */
 .tag-gradient {
   background-size: 200% 200%;
   animation: gradientShift 3s ease infinite;
   background-image: linear-gradient(45deg, rgba(59, 130, 246, 0.1), rgba(147, 197, 253, 0.2));
-}
-
-@keyframes gradientShift {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
 }
 
 .tag-hover {
@@ -430,15 +415,14 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
+.tag-text {
+  color: white;
+}
+
 /* Dialog styles */
 .dialog-content {
   background-color: white;
   border-color: #e5e7eb;
-}
-
-/* Ensure tag text is visible */
-.tag-text {
-  color: white;
 }
 
 /* Ensure circular images on all devices */
