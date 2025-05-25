@@ -9,7 +9,7 @@ import { ArrowLeft } from "lucide-react"
 import { Channel, MessageInput, MessageList, Thread, Window } from "stream-chat-react"
 import { useStreamContext } from "@/components/providers/StreamProvider"
 import type { Channel as StreamChannel } from "stream-chat"
-import "stream-chat-react/dist/css/v2/index.css"
+
 
 interface User {
   id: string
