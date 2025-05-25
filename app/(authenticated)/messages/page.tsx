@@ -8,7 +8,7 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { MessageCircle, Search, Users, Plus, X, ArrowLeft } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { StreamChat, Channel as StreamChannel } from 'stream-chat'
+import { StreamChat, Channel as StreamChannel, UserResponse } from 'stream-chat'
 import { 
   Chat, 
   Channel, 
@@ -23,6 +23,11 @@ import {
   useChatContext
 } from 'stream-chat-react'
 import type { ChannelSort, ChannelFilters, ChannelOptions } from 'stream-chat'
+
+// Extend the UserResponse type to include nickname
+interface ExtendedUserResponse extends UserResponse {
+  nickname?: string
+}
 
 interface User {
   id: string
@@ -46,31 +51,45 @@ const CustomChannelPreview = (props: ChannelPreviewUIComponentProps) => {
 
   // Get channel name from members if not set
   const getChannelName = () => {
-    // Check if channel has a custom name property
+    // Check if channel has a custom name property - safe access
     const channelData = channel.data as any
     if (channelData?.name) return channelData.name
     
-    // For messaging channels, get the other member's name
-    const members = Object.values(channel.state.members || {})
-    const currentUserId = channel._client?.user?.id
-    const otherMember = members.find(member => member.user?.id !== currentUserId)
+    // Check for other possible name properties
+    if (channelData?.display_name) return channelData.display_name
+    if (channelData?.channel_name) return channelData.channel_name
     
-    return otherMember?.user?.name || otherMember?.user?.id || "Conversation"
+    // For messaging channels, get the other member's name
+    const members = Object.values(channel.state?.members || {})
+    const currentUserId = channel._client?.user?.id
+    const otherMember = members.find((member: any) => member.user?.id !== currentUserId)
+    const otherUser = otherMember?.user as ExtendedUserResponse | undefined
+    
+    // Return the other member's name (which includes nickname if available), fallback to their ID, or generic name
+    return otherUser?.name || 
+           otherUser?.id || 
+           channel.id || 
+           "Conversation"
   }
 
   // Get channel image from members if not set
   const getChannelImage = () => {
-    // For messaging channels, get the other member's image
-    const members = Object.values(channel.state.members || {})
-    const currentUserId = channel._client?.user?.id
-    const otherMember = members.find(member => member.user?.id !== currentUserId)
+    // Check for channel image first
+    const channelData = channel.data as any
+    if (channelData?.image) return channelData.image
     
-    return otherMember?.user?.image
+    // For messaging channels, get the other member's image
+    const members = Object.values(channel.state?.members || {})
+    const currentUserId = channel._client?.user?.id
+    const otherMember = members.find((member: any) => member.user?.id !== currentUserId)
+    const otherUser = otherMember?.user as ExtendedUserResponse | undefined
+    
+    return otherUser?.image
   }
 
   const channelName = getChannelName()
   const channelImage = getChannelImage()
-  const lastMessage = channel.state.messages[channel.state.messages.length - 1]
+  const lastMessage = channel.state?.messages?.[channel.state.messages.length - 1]
 
   return (
     <div 
@@ -179,6 +198,7 @@ export default function MessagesPage() {
         
         const { token } = await tokenResponse.json()
         
+        // Connect user to Stream Chat - use nickname as the display name
         await chatClient.connectUser(
           {
             id: session.user.id,
