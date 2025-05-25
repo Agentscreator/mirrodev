@@ -100,8 +100,9 @@ export default function DiscoverPage() {
     setTimeout(() => setShowSearchResults(false), 200)
   }
 
-  // Navigate to user profile
+  // Navigate to user profile - FIXED
   const handleViewProfile = (userId: string) => {
+    setShowSearchResults(false) // Hide search results when navigating
     router.push(`/authenticated/profile/${userId}`)
   }
 
@@ -117,6 +118,7 @@ export default function DiscoverPage() {
     }
 
     setMessagingUser(userId)
+    setShowSearchResults(false) // Hide search results
 
     try {
       // Create/get channel via API
@@ -127,12 +129,11 @@ export default function DiscoverPage() {
       })
 
       if (!response.ok) {
-        throw new Error("Failed to create channel")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to create channel")
       }
 
-      const { channelId } = await response.json()
-
-      // Navigate to the message page
+      // Navigate to the message page immediately
       router.push(`/authenticated/messages/${userId}`)
     } catch (error) {
       console.error("Error creating channel:", error)

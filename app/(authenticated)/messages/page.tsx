@@ -30,7 +30,8 @@ export default function UserMessagePage() {
 
   useEffect(() => {
     const initializeChat = async () => {
-      if (!streamClient || !isReady || !userId) {
+      // Add better checks for Stream readiness
+      if (!streamClient || !isReady || !userId || streamError) {
         if (streamError) {
           setError("Chat service unavailable")
         }
@@ -41,22 +42,23 @@ export default function UserMessagePage() {
         setLoading(true)
         setError(null)
 
-        // Fetch user information
+        // Fetch user information first
         const userResponse = await fetch(`/api/users/${userId}`)
-        if (userResponse.ok) {
-          const userData = await userResponse.json()
-          setUser({
-            id: userData.user.id,
-            username: userData.user.username,
-            nickname: userData.user.nickname,
-            image: userData.user.image || userData.user.profileImage,
-          })
-        } else if (userResponse.status === 404) {
-          setError("User not found")
-          return
-        } else {
+        if (!userResponse.ok) {
+          if (userResponse.status === 404) {
+            setError("User not found")
+            return
+          }
           throw new Error("Failed to fetch user data")
         }
+
+        const userData = await userResponse.json()
+        setUser({
+          id: userData.user.id,
+          username: userData.user.username,
+          nickname: userData.user.nickname,
+          image: userData.user.image || userData.user.profileImage,
+        })
 
         // Create or get existing channel via API
         const channelResponse = await fetch("/api/stream/channel", {
@@ -66,14 +68,31 @@ export default function UserMessagePage() {
         })
 
         if (!channelResponse.ok) {
-          throw new Error("Failed to create channel")
+          const errorData = await channelResponse.json()
+          throw new Error(errorData.error || "Failed to create channel")
         }
 
         const { channelId } = await channelResponse.json()
 
-        // Get the channel from Stream client
-        const streamChannel = streamClient.channel("messaging", channelId)
-        await streamChannel.watch()
+        // Get the channel from Stream client with retry logic
+        let retries = 3
+        let streamChannel = null
+
+        while (retries > 0 && !streamChannel) {
+          try {
+            streamChannel = streamClient.channel("messaging", channelId)
+            await streamChannel.watch()
+            break
+          } catch (channelError) {
+            console.warn(`Channel watch attempt failed, retries left: ${retries - 1}`, channelError)
+            retries--
+            if (retries === 0) {
+              throw channelError
+            }
+            // Wait a bit before retrying
+            await new Promise((resolve) => setTimeout(resolve, 1000))
+          }
+        }
 
         setChannel(streamChannel)
       } catch (err) {
@@ -84,7 +103,13 @@ export default function UserMessagePage() {
       }
     }
 
-    initializeChat()
+    // Only initialize when we have all required data
+    if (streamClient && isReady && userId && !streamError) {
+      initializeChat()
+    } else if (streamError) {
+      setError("Chat service unavailable")
+      setLoading(false)
+    }
   }, [streamClient, isReady, userId, streamError])
 
   if (loading) {

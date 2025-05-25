@@ -1,7 +1,7 @@
-// app/api/stream/channel/route.ts
-import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/src/lib/auth'
-import { StreamChat } from 'stream-chat'
+import { type NextRequest, NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/src/lib/auth"
+import { StreamChat } from "stream-chat"
 
 // Create server client instance with error handling
 let serverClient: StreamChat | null = null
@@ -10,11 +10,11 @@ const getServerClient = () => {
   if (!serverClient) {
     const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY
     const secret = process.env.STREAM_SECRET_KEY
-    
+
     if (!apiKey || !secret) {
-      throw new Error('Stream API key or secret not configured')
+      throw new Error("Stream API key or secret not configured")
     }
-    
+
     serverClient = StreamChat.getInstance(apiKey, secret)
   }
   return serverClient
@@ -23,26 +23,32 @@ const getServerClient = () => {
 export async function POST(request: NextRequest) {
   try {
     // Verify authentication
-    const session = await auth()
+    const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     // Parse request body
     const body = await request.json()
     const { recipientId } = body
-    
-    if (!recipientId || typeof recipientId !== 'string') {
-      return NextResponse.json({ 
-        error: 'Valid recipient ID is required' 
-      }, { status: 400 })
+
+    if (!recipientId || typeof recipientId !== "string") {
+      return NextResponse.json(
+        {
+          error: "Valid recipient ID is required",
+        },
+        { status: 400 },
+      )
     }
 
     // Prevent self-messaging
     if (recipientId === session.user.id) {
-      return NextResponse.json({ 
-        error: 'Cannot create channel with yourself' 
-      }, { status: 400 })
+      return NextResponse.json(
+        {
+          error: "Cannot create channel with yourself",
+        },
+        { status: 400 },
+      )
     }
 
     const currentUserId = session.user.id
@@ -50,65 +56,58 @@ export async function POST(request: NextRequest) {
 
     // Create consistent channel ID
     const members = [currentUserId, recipientId].sort()
-    const channelId = `dm_${members.join('_')}`
+    const channelId = `dm_${members.join("_")}`
 
     try {
       // Try to get existing channel first
-      const existingChannel = client.channel('messaging', channelId)
+      const existingChannel = client.channel("messaging", channelId)
       await existingChannel.query()
-      
-      return NextResponse.json({ 
+
+      return NextResponse.json({
         channelId,
         success: true,
-        existed: true
+        existed: true,
       })
     } catch (channelError) {
       // Channel doesn't exist, create new one
       try {
-        const newChannel = client.channel('messaging', channelId, {
+        const newChannel = client.channel("messaging", channelId, {
           members: members,
           created_by_id: currentUserId,
-          // Removed 'name' property as it's not supported in ChannelData
         })
 
-        // Create channel - the create() method doesn't need additional parameters
-        // when the channel is already configured with members and created_by_id
         await newChannel.create()
-        
-        return NextResponse.json({ 
+
+        return NextResponse.json({
           channelId,
           success: true,
-          existed: false
+          existed: false,
         })
       } catch (createError) {
-        console.error('Channel creation failed:', createError)
+        console.error("Channel creation failed:", createError)
         throw createError
       }
     }
-
   } catch (error) {
-    console.error('Stream channel API error:', error)
-    
+    console.error("Stream channel API error:", error)
+
     // Provide more specific error messages
-    let errorMessage = 'Failed to create channel'
+    let errorMessage = "Failed to create channel"
     let statusCode = 500
-    
+
     if (error instanceof Error) {
-      if (error.message.includes('API key')) {
-        errorMessage = 'Chat service configuration error'
-      } else if (error.message.includes('Unauthorized')) {
-        errorMessage = 'Authentication failed'
+      if (error.message.includes("API key")) {
+        errorMessage = "Chat service configuration error"
+      } else if (error.message.includes("Unauthorized")) {
+        errorMessage = "Authentication failed"
         statusCode = 401
-      } else if (error.message.includes('not found')) {
-        errorMessage = 'User not found'
+      } else if (error.message.includes("not found")) {
+        errorMessage = "User not found"
         statusCode = 404
       }
     }
-    
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: statusCode }
-    )
+
+    return NextResponse.json({ error: errorMessage }, { status: statusCode })
   }
 }
 
@@ -116,17 +115,17 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   try {
     const client = getServerClient()
-    return NextResponse.json({ 
-      status: 'healthy',
-      streamConnected: !!client
+    return NextResponse.json({
+      status: "healthy",
+      streamConnected: !!client,
     })
   } catch (error) {
     return NextResponse.json(
-      { 
-        status: 'unhealthy',
-        error: 'Stream client configuration error'
+      {
+        status: "unhealthy",
+        error: "Stream client configuration error",
       },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

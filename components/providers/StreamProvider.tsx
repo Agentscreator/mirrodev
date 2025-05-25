@@ -1,9 +1,11 @@
-// components/providers/StreamProvider.tsx
 "use client"
 
-import { createContext, useContext, useEffect, useState, useRef } from 'react'
-import { StreamChat } from 'stream-chat'
-import type { User } from 'stream-chat'
+import type React from "react"
+
+import { createContext, useContext, useEffect, useState, useRef } from "react"
+import { StreamChat } from "stream-chat"
+import type { User } from "stream-chat"
+import { useSession } from "next-auth/react"
 
 interface StreamContextType {
   client: StreamChat | null
@@ -16,25 +18,23 @@ const StreamContext = createContext<StreamContextType>({
   client: null,
   isReady: false,
   error: null,
-  user: null
+  user: null,
 })
 
 export const useStreamContext = () => {
   const context = useContext(StreamContext)
   if (!context) {
-    throw new Error('useStreamContext must be used within StreamProvider')
+    throw new Error("useStreamContext must be used within StreamProvider")
   }
   return context
 }
 
 interface StreamProviderProps {
   children: React.ReactNode
-  userId?: string
-  userToken?: string
-  userData?: any
 }
 
-export function StreamProvider({ children, userId, userToken, userData }: StreamProviderProps) {
+export function StreamProvider({ children }: StreamProviderProps) {
+  const { data: session, status } = useSession()
   const [client, setClient] = useState<StreamChat | null>(null)
   const [isReady, setIsReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -44,13 +44,35 @@ export function StreamProvider({ children, userId, userToken, userData }: Stream
 
   useEffect(() => {
     const initializeStream = async () => {
-      // Prevent multiple initializations
-      if (initializingRef.current || !userId || !userToken) {
+      // Wait for session to be loaded
+      if (status === "loading") {
         return
       }
 
-      // If client already exists and is connected, don't reinitialize
-      if (clientRef.current?.userID === userId) {
+      // If no session, clear everything
+      if (!session?.user?.id) {
+        if (clientRef.current) {
+          try {
+            await clientRef.current.disconnectUser()
+          } catch (err) {
+            console.warn("Error disconnecting client:", err)
+          }
+          clientRef.current = null
+        }
+        setClient(null)
+        setIsReady(false)
+        setUser(null)
+        setError(null)
+        return
+      }
+
+      // Prevent multiple initializations
+      if (initializingRef.current) {
+        return
+      }
+
+      // If client already exists and is connected to the same user, don't reinitialize
+      if (clientRef.current?.userID === session.user.id && isReady) {
         return
       }
 
@@ -64,7 +86,7 @@ export function StreamProvider({ children, userId, userToken, userData }: Stream
           try {
             await clientRef.current.disconnectUser()
           } catch (err) {
-            console.warn('Error disconnecting previous client:', err)
+            console.warn("Error disconnecting previous client:", err)
           }
           clientRef.current = null
         }
@@ -72,30 +94,40 @@ export function StreamProvider({ children, userId, userToken, userData }: Stream
         // Create new client instance
         const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY
         if (!apiKey) {
-          throw new Error('Stream API key not found')
+          throw new Error("Stream API key not found")
         }
 
         const streamClient = StreamChat.getInstance(apiKey)
-        
+
+        // Get token from API
+        const tokenResponse = await fetch("/api/stream/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        })
+
+        if (!tokenResponse.ok) {
+          throw new Error("Failed to get Stream token")
+        }
+
+        const { token } = await tokenResponse.json()
+
         // Prepare user data
         const streamUser: User = {
-          id: userId,
-          name: userData?.nickname || userData?.username || userId,
-          image: userData?.image || userData?.profileImage,
-          ...userData
+          id: session.user.id,
+          name: session.user.name || session.user.email || session.user.id,
+          image: session.user.image || undefined,
         }
 
         // Connect user
-        await streamClient.connectUser(streamUser, userToken)
-        
+        await streamClient.connectUser(streamUser, token)
+
         clientRef.current = streamClient
         setClient(streamClient)
         setUser(streamUser)
         setIsReady(true)
-
       } catch (err) {
-        console.error('Stream initialization error:', err)
-        setError(err instanceof Error ? err.message : 'Failed to initialize chat')
+        console.error("Stream initialization error:", err)
+        setError(err instanceof Error ? err.message : "Failed to initialize chat")
       } finally {
         initializingRef.current = false
       }
@@ -110,7 +142,7 @@ export function StreamProvider({ children, userId, userToken, userData }: Stream
         clientRef.current = null
       }
     }
-  }, [userId, userToken, userData])
+  }, [session, status, isReady])
 
   // Handle component unmount
   useEffect(() => {
@@ -125,12 +157,8 @@ export function StreamProvider({ children, userId, userToken, userData }: Stream
     client,
     isReady,
     error,
-    user
+    user,
   }
 
-  return (
-    <StreamContext.Provider value={contextValue}>
-      {children}
-    </StreamContext.Provider>
-  )
+  return <StreamContext.Provider value={contextValue}>{children}</StreamContext.Provider>
 }
