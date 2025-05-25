@@ -1,9 +1,4 @@
-/* Stream Chat React CSS - Main Stylesheet */
-
-/* Reset and Base Styles */
-* {
-  box-sizing: border-box;
-}
+/* Stream Chat React CSS - Next.js Compatible */
 
 .str-chat {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -385,50 +380,48 @@
 }
 
 /* Dark Mode Support */
-@media (prefers-color-scheme: dark) {
-  .str-chat {
-    background: #1a1a1a;
-    color: #ffffff;
-  }
+.dark .str-chat {
+  background: #1a1a1a;
+  color: #ffffff;
+}
 
-  .str-chat__channel-list {
-    background: #2d2d30;
-    border-right-color: #404040;
-  }
+.dark .str-chat__channel-list {
+  background: #2d2d30;
+  border-right-color: #404040;
+}
 
-  .str-chat__channel-list-header,
-  .str-chat__header-livestream,
-  .str-chat__input-flat {
-    background: #2d2d30;
-    border-color: #404040;
-  }
+.dark .str-chat__channel-list-header,
+.dark .str-chat__header-livestream,
+.dark .str-chat__input-flat {
+  background: #2d2d30;
+  border-color: #404040;
+}
 
-  .str-chat__channel-preview:hover {
-    background: #404040;
-  }
+.dark .str-chat__channel-preview:hover {
+  background: #404040;
+}
 
-  .str-chat__channel-preview--selected {
-    background: #1a3a5c;
-  }
+.dark .str-chat__channel-preview--selected {
+  background: #1a3a5c;
+}
 
-  .str-chat__message-bubble--other {
-    background: #404040;
-    color: #ffffff;
-  }
+.dark .str-chat__message-bubble--other {
+  background: #404040;
+  color: #ffffff;
+}
 
-  .str-chat__input-flat-wrapper {
-    background: #2d2d30;
-    border-color: #404040;
-  }
+.dark .str-chat__input-flat-wrapper {
+  background: #2d2d30;
+  border-color: #404040;
+}
 
-  .str-chat__input-flat textarea {
-    color: #ffffff;
-    background: transparent;
-  }
+.dark .str-chat__input-flat textarea {
+  color: #ffffff;
+  background: transparent;
+}
 
-  .str-chat__input-flat textarea::placeholder {
-    color: #858688;
-  }
+.dark .str-chat__input-flat textarea::placeholder {
+  color: #858688;
 }
 
 /* Utility Classes */
