@@ -2,7 +2,7 @@
 import type { Metadata } from "next"
 import { Providers } from "./providers"
 import "./globals.css"
-import "stream-chat-react/dist/css/index.css"
+import "./stream-chat.css"
 
 export const metadata: Metadata = {
   title: "Mirro",
