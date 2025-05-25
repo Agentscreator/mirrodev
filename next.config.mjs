@@ -14,22 +14,6 @@ const nextConfig = {
   
   // Webpack configuration to handle CSS processing
   webpack: (config, { isServer }) => {
-    // Add CSS handling for stream-chat-react
-    config.module.rules.push({
-      test: /\.css$/,
-      include: [/node_modules\/stream-chat-react/],
-      use: [
-        'style-loader',
-        {
-          loader: 'css-loader',
-          options: {
-            importLoaders: 1,
-            modules: false,
-          },
-        },
-      ],
-    });
-
     // Resolve fallbacks for client-side builds
     if (!isServer) {
       config.resolve.fallback = {

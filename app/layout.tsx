@@ -1,8 +1,8 @@
-
 // app/layout.tsx
 import type { Metadata } from "next"
 import { Providers } from "./providers"
 import "./globals.css"
+import "stream-chat-react/dist/css/v2/index.css"
 
 export const metadata: Metadata = {
   title: "Mirro",
