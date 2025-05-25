@@ -441,7 +441,7 @@ Examples:
         Second half: Explain similarities and connections between you (the user) and ${recommendedUserNickname}, addressing the user directly as "you". You (the user) are described as: ${userASummary}`
       }
     ],
-    max_tokens: 140,
+    max_tokens: 200,
     temperature: 0.7,
   });
   
