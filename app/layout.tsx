@@ -2,7 +2,6 @@
 import type { Metadata } from "next"
 import { Providers } from "./providers"
 import "./globals.css"
-import "./stream-chat.css"  // Change this line
 
 export const metadata: Metadata = {
   title: "Mirro",
@@ -16,6 +15,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="stylesheet" href="/stream-chat.css" />
+      </head>
       <body>
         <Providers>{children}</Providers>
       </body>
