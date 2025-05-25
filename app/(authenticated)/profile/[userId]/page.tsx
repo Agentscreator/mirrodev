@@ -150,7 +150,7 @@ export default function ProfilePage() {
           }
         }
 
-        const postsResponse = await fetch(`/api/posts/user/${targetUserId}?t=${Date.now()}`)
+        const postsResponse = await fetch(`/api/posts?userId=${targetUserId}?t=${Date.now()}`)
         if (postsResponse.ok) {
           const postsData = await postsResponse.json()
           const newPosts = postsData.posts || []

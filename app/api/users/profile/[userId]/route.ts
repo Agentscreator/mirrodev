@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  context: { params: { userId: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -17,7 +17,11 @@ export async function GET(
 
     const { searchParams } = new URL(request.url)
     const includeTags = searchParams.get('includeTags') === 'true'
-    const userId = params.userId
+
+    const userId = context.params.userId
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    }
 
     // Get user basic info
     const user = await db
