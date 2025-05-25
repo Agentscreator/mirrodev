@@ -23,7 +23,6 @@ import {
   Eye,
   MoreHorizontal,
   RefreshCw,
-  Sparkles,
   MapPin,
 } from "lucide-react"
 import { ImageUpload } from "@/components/image-upload"
@@ -70,6 +69,14 @@ interface Tag {
   tagCategory: string
 }
 
+interface FollowUser {
+  id: string
+  username: string
+  nickname?: string
+  profileImage?: string
+  image?: string
+}
+
 export default function ProfilePage() {
   const params = useParams()
   const { data: session } = useSession()
@@ -80,6 +87,8 @@ export default function ProfilePage() {
   const [user, setUser] = useState<ProfileUser | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [posts, setPosts] = useState<Post[]>([])
+  const [followers, setFollowers] = useState<FollowUser[]>([])
+  const [following, setFollowing] = useState<FollowUser[]>([])
   const [loading, setLoading] = useState(true)
   const [postsLoading, setPostsLoading] = useState(false)
   const [profileImageUploading, setProfileImageUploading] = useState(false)
@@ -89,6 +98,8 @@ export default function ProfilePage() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isTagDialogOpen, setIsTagDialogOpen] = useState(false)
+  const [isFollowersDialogOpen, setIsFollowersDialogOpen] = useState(false)
+  const [isFollowingDialogOpen, setIsFollowingDialogOpen] = useState(false)
   const [isFollowing, setIsFollowing] = useState(false)
   const [userTags, setUserTags] = useState<string[]>([])
 
@@ -168,6 +179,30 @@ export default function ProfilePage() {
     },
     [cacheKey],
   )
+
+  const fetchFollowers = async (targetUserId: string) => {
+    try {
+      const response = await fetch(`/api/users/${targetUserId}/followers`)
+      if (response.ok) {
+        const data = await response.json()
+        setFollowers(data.followers || [])
+      }
+    } catch (error) {
+      console.error("Error fetching followers:", error)
+    }
+  }
+
+  const fetchFollowing = async (targetUserId: string) => {
+    try {
+      const response = await fetch(`/api/users/${targetUserId}/following`)
+      if (response.ok) {
+        const data = await response.json()
+        setFollowing(data.following || [])
+      }
+    } catch (error) {
+      console.error("Error fetching following:", error)
+    }
+  }
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -277,8 +312,8 @@ export default function ProfilePage() {
         setImagePreview(null)
 
         toast({
-          title: "✨ Success",
-          description: "Your post has been shared!",
+          title: "Success",
+          description: "Post created successfully!",
         })
       } else {
         throw new Error("Failed to create post")
@@ -389,7 +424,7 @@ export default function ProfilePage() {
         profileCacheKeys.forEach((key) => sessionStorage.removeItem(key))
 
         toast({
-          title: "✨ Success",
+          title: "Success",
           description: "Profile picture updated successfully!",
         })
       } else {
@@ -420,12 +455,12 @@ export default function ProfilePage() {
       })
 
       if (response.ok) {
-        const updatedUser = await response.json()
-        setUser((prev) => (prev ? { ...prev, about: updatedUser.about } : null))
+        const data = await response.json()
+        setUser((prev) => (prev ? { ...prev, about: data.user?.about || editedAbout } : null))
         setIsEditingAbout(false)
 
         toast({
-          title: "✨ Success",
+          title: "Success",
           description: "About section updated successfully!",
         })
       } else {
@@ -460,7 +495,7 @@ export default function ProfilePage() {
         setIsTagDialogOpen(false)
 
         toast({
-          title: "✨ Success",
+          title: "Success",
           description: "Tags updated successfully!",
         })
       } else {
@@ -496,7 +531,7 @@ export default function ProfilePage() {
         )
 
         toast({
-          title: "✨ Success",
+          title: "Success",
           description: isFollowing ? "Unfollowed successfully!" : "Following successfully!",
         })
       } else {
@@ -524,13 +559,13 @@ export default function ProfilePage() {
 
       if (response.ok) {
         const data = await response.json()
-        router.push(`/authenticated/messages?channelId=${data.channelId || user.id}`)
+        router.push(`/authenticated/messages/${user.id}`)
       } else {
-        router.push(`/authenticated/messages?userId=${user.id}`)
+        router.push(`/authenticated/messages/${user.id}`)
       }
     } catch (error) {
       console.error("Error creating channel:", error)
-      router.push(`/authenticated/messages?userId=${user.id}`)
+      router.push(`/authenticated/messages/${user.id}`)
     }
   }
 
@@ -538,6 +573,22 @@ export default function ProfilePage() {
     const targetUserId = userId || session?.user?.id
     if (targetUserId) {
       await fetchPosts(targetUserId, true)
+    }
+  }
+
+  const handleViewFollowers = async () => {
+    const targetUserId = userId || session?.user?.id
+    if (targetUserId) {
+      await fetchFollowers(targetUserId)
+      setIsFollowersDialogOpen(true)
+    }
+  }
+
+  const handleViewFollowing = async () => {
+    const targetUserId = userId || session?.user?.id
+    if (targetUserId) {
+      await fetchFollowing(targetUserId)
+      setIsFollowingDialogOpen(true)
     }
   }
 
@@ -552,561 +603,588 @@ export default function ProfilePage() {
   const getTagColor = (category: string) => {
     switch (category) {
       case "interest":
-        return "bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border-blue-200"
+        return "bg-blue-100 text-blue-700"
       case "context":
-        return "bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-800 border-emerald-200"
+        return "bg-green-100 text-green-700"
       case "intention":
-        return "bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 border-purple-200"
+        return "bg-purple-100 text-purple-700"
       default:
-        return "bg-gradient-to-r from-gray-100 to-slate-100 text-gray-800 border-gray-200"
+        return "bg-gray-100 text-gray-700"
     }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-        <div className="flex justify-center items-center py-32">
-          <div className="relative">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200"></div>
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent absolute top-0"></div>
-          </div>
-        </div>
+      <div className="flex justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     )
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-            <Users className="w-10 h-10 text-gray-400" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">User not found</h2>
-          <p className="text-gray-600">The profile you're looking for doesn't exist.</p>
-        </div>
+      <div className="text-center py-12">
+        <h2 className="text-xl font-semibold text-gray-600">User not found</h2>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Gorgeous Hero Section */}
-        <div className="relative mb-8 overflow-hidden">
-          {/* Animated background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 opacity-90"></div>
-          <div className="absolute inset-0 bg-gradient-to-tr from-blue-400/20 via-transparent to-purple-400/20"></div>
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Enhanced Mobile-Optimized Hero Section */}
+      <div className="relative mb-6">
+        {/* Background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-blue-50 rounded-2xl sm:rounded-3xl"></div>
 
-          {/* Floating elements */}
-          <div className="absolute top-4 right-4 w-20 h-20 bg-white/10 rounded-full blur-xl animate-pulse"></div>
-          <div className="absolute bottom-6 left-6 w-16 h-16 bg-pink-300/20 rounded-full blur-lg animate-bounce"></div>
+        {/* Content */}
+        <div className="relative p-4 sm:p-6 lg:p-8">
+          {/* Mobile: Stack profile picture and info vertically */}
+          <div className="flex flex-col items-center text-center sm:flex-row sm:items-start sm:gap-6 sm:text-left">
+            {/* Profile Picture */}
+            <div className="flex flex-col items-center mb-4 sm:mb-0 sm:flex-shrink-0">
+              <div className="relative group">
+                <div className="relative h-24 w-24 sm:h-28 sm:w-28 lg:h-32 lg:w-32 overflow-hidden rounded-full bg-gradient-to-br from-blue-400 to-blue-600 p-1 shadow-xl">
+                  <div className="h-full w-full overflow-hidden rounded-full bg-white">
+                    <Image
+                      src={user.profileImage || user.image || "/placeholder.svg?height=150&width=150"}
+                      alt={user.username}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 640px) 96px, (max-width: 1024px) 112px, 128px"
+                    />
+                  </div>
+                </div>
+                {isOwnProfile && (
+                  <label
+                    className={cn(
+                      "absolute bottom-0 right-0 h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg cursor-pointer flex items-center justify-center transition-all",
+                      profileImageUploading && "opacity-50 cursor-not-allowed",
+                    )}
+                  >
+                    {profileImageUploading ? (
+                      <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <Camera className="h-3 w-3 sm:h-4 sm:w-4" />
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleProfileImageChange}
+                      className="hidden"
+                      disabled={profileImageUploading}
+                    />
+                  </label>
+                )}
+              </div>
+              {user.nickname && (
+                <div className="mt-2 sm:mt-3">
+                  <span className="text-lg sm:text-xl font-medium text-gray-900">{user.nickname}</span>
+                </div>
+              )}
+            </div>
 
-          {/* Content */}
-          <div className="relative p-6 sm:p-8 lg:p-12">
-            <div className="flex flex-col items-center text-center sm:flex-row sm:items-start sm:gap-8 sm:text-left">
-              {/* Profile Picture */}
-              <div className="flex flex-col items-center mb-6 sm:mb-0 sm:flex-shrink-0">
-                <div className="relative group">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400 rounded-full blur opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-tilt"></div>
-                  <div className="relative h-28 w-28 sm:h-32 sm:w-32 lg:h-36 lg:w-36 overflow-hidden rounded-full bg-white p-1 shadow-2xl">
-                    <div className="h-full w-full overflow-hidden rounded-full">
-                      <Image
-                        src={user.profileImage || user.image || "/placeholder.svg?height=150&width=150"}
-                        alt={user.username}
-                        fill
-                        className="object-cover transition-transform duration-300 group-hover:scale-110"
-                        sizes="(max-width: 640px) 112px, (max-width: 1024px) 128px, 144px"
-                      />
+            {/* Profile Info */}
+            <div className="flex-1 w-full">
+              <div className="flex flex-col items-center sm:items-start">
+                <div className="mb-3 sm:mb-4">
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1">{user.username}</h1>
+                  {user.metro_area && (
+                    <div className="flex items-center justify-center sm:justify-start gap-1 text-sm text-gray-500 mb-2">
+                      <MapPin className="h-3 w-3" />
+                      <span>{user.metro_area}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-center sm:justify-start gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600">
+                    <button
+                      onClick={handleViewFollowers}
+                      className="flex items-center gap-1 hover:text-blue-600 transition-colors"
+                    >
+                      <UserPlus className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="font-medium">{user.followers || 0}</span>
+                      <span>followers</span>
+                    </button>
+                    <button
+                      onClick={handleViewFollowing}
+                      className="flex items-center gap-1 hover:text-blue-600 transition-colors"
+                    >
+                      <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="font-medium">{user.following || 0}</span>
+                      <span>following</span>
+                    </button>
+                    <div className="flex items-center gap-1">
+                      <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="font-medium">{user.visitors || 0}</span>
+                      <span>views</span>
                     </div>
                   </div>
-                  {isOwnProfile && (
-                    <label
+                </div>
+
+                {/* Mobile-optimized Action Buttons */}
+                {!isOwnProfile && (
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <Button
+                      onClick={handleFollowToggle}
                       className={cn(
-                        "absolute bottom-1 right-1 h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg cursor-pointer flex items-center justify-center transition-all duration-300 hover:scale-110 hover:shadow-xl",
-                        profileImageUploading && "opacity-50 cursor-not-allowed",
+                        "flex-1 sm:flex-none rounded-full px-4 sm:px-6 text-sm font-medium",
+                        isFollowing
+                          ? "bg-white border border-blue-200 text-blue-600 hover:bg-blue-50"
+                          : "bg-blue-600 hover:bg-blue-700 text-white",
                       )}
                     >
-                      {profileImageUploading ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      {isFollowing ? (
+                        <>
+                          <Check className="h-4 w-4 mr-1 sm:mr-2" />
+                          <span className="hidden sm:inline">Following</span>
+                          <span className="sm:hidden">Following</span>
+                        </>
                       ) : (
-                        <Camera className="h-4 w-4" />
+                        <>
+                          <UserPlus className="h-4 w-4 mr-1 sm:mr-2" />
+                          Follow
+                        </>
                       )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleProfileImageChange}
-                        className="hidden"
-                        disabled={profileImageUploading}
-                      />
-                    </label>
-                  )}
-                </div>
-                {user.nickname && (
-                  <div className="mt-4">
-                    <span className="text-xl sm:text-2xl font-bold text-white drop-shadow-lg">{user.nickname}</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 sm:flex-none rounded-full border-blue-200 hover:bg-blue-50 text-blue-600 px-4 sm:px-6 text-sm"
+                      onClick={handleMessage}
+                    >
+                      <MessageCircle className="h-4 w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Message</span>
+                      <span className="sm:hidden">Chat</span>
+                    </Button>
                   </div>
                 )}
               </div>
-
-              {/* Profile Info */}
-              <div className="flex-1 w-full">
-                <div className="flex flex-col items-center sm:items-start">
-                  <div className="mb-6">
-                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 drop-shadow-lg">
-                      {user.username}
-                    </h1>
-                    {user.metro_area && (
-                      <div className="flex items-center justify-center sm:justify-start gap-2 text-white/90 mb-4">
-                        <MapPin className="h-4 w-4" />
-                        <span className="text-sm font-medium">{user.metro_area}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-center sm:justify-start gap-6 text-white/90">
-                      <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-3 py-1.5">
-                        <UserPlus className="h-4 w-4" />
-                        <span className="font-semibold">{user.followers || 0}</span>
-                        <span className="text-xs">followers</span>
-                      </div>
-                      <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-3 py-1.5">
-                        <Users className="h-4 w-4" />
-                        <span className="font-semibold">{user.following || 0}</span>
-                        <span className="text-xs">following</span>
-                      </div>
-                      <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-3 py-1.5">
-                        <Eye className="h-4 w-4" />
-                        <span className="font-semibold">{user.visitors || 0}</span>
-                        <span className="text-xs">views</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  {!isOwnProfile && (
-                    <div className="flex gap-3 w-full sm:w-auto">
-                      <Button
-                        onClick={handleFollowToggle}
-                        className={cn(
-                          "flex-1 sm:flex-none rounded-full px-6 py-3 font-semibold transition-all duration-300 hover:scale-105 hover:shadow-xl",
-                          isFollowing
-                            ? "bg-white/20 backdrop-blur-sm border border-white/30 text-white hover:bg-white/30"
-                            : "bg-white text-indigo-600 hover:bg-gray-50 shadow-lg",
-                        )}
-                      >
-                        {isFollowing ? (
-                          <>
-                            <Check className="h-4 w-4 mr-2" />
-                            Following
-                          </>
-                        ) : (
-                          <>
-                            <UserPlus className="h-4 w-4 mr-2" />
-                            Follow
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="flex-1 sm:flex-none rounded-full bg-white/20 backdrop-blur-sm border-white/30 text-white hover:bg-white/30 px-6 py-3 font-semibold transition-all duration-300 hover:scale-105 hover:shadow-xl"
-                        onClick={handleMessage}
-                      >
-                        <MessageCircle className="h-4 w-4 mr-2" />
-                        Message
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
           </div>
-        </div>
 
-        {/* About Section */}
-        <div className="mb-8">
-          {isEditingAbout ? (
-            <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-3xl overflow-hidden">
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  <Textarea
-                    value={editedAbout}
-                    onChange={(e) => setEditedAbout(e.target.value)}
-                    className="min-h-[120px] rounded-2xl border-indigo-200 bg-white/50 backdrop-blur-sm resize-none text-base focus:border-indigo-400 focus:ring-indigo-400/20"
-                    placeholder="Tell us about yourself..."
-                  />
-                  <div className="flex justify-end gap-3">
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsEditingAbout(false)}
-                      className="rounded-full px-6 border-gray-300 hover:bg-gray-50"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleSaveAbout}
-                      className="rounded-full px-6 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-                    >
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Save
-                    </Button>
-                  </div>
+          {/* About Section - Full width on mobile */}
+          <div className="mt-4 sm:mt-6">
+            {isEditingAbout ? (
+              <div className="space-y-3">
+                <Textarea
+                  value={editedAbout}
+                  onChange={(e) => setEditedAbout(e.target.value)}
+                  className="min-h-[80px] sm:min-h-[100px] rounded-xl sm:rounded-2xl border-blue-200 bg-white/80 backdrop-blur-sm resize-none text-sm sm:text-base"
+                  placeholder="Tell us about yourself..."
+                />
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsEditingAbout(false)}
+                    className="rounded-full px-4 text-sm"
+                    size="sm"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveAbout}
+                    className="rounded-full px-4 bg-blue-600 hover:bg-blue-700 text-sm"
+                    size="sm"
+                  >
+                    Save
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="relative group">
-              <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-3xl overflow-hidden hover:shadow-2xl transition-all duration-300">
-                <CardContent className="p-6 sm:p-8">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-indigo-500" />
-                        About
-                      </h3>
-                      <p className="text-gray-700 leading-relaxed text-base">
-                        {user.about || "No bio available yet. This is where your story begins! ✨"}
-                      </p>
-                    </div>
-                    {isOwnProfile && (
+              </div>
+            ) : (
+              <div className="relative group">
+                <div className="rounded-xl sm:rounded-2xl bg-white/80 backdrop-blur-sm border border-blue-100 p-4 sm:p-6 shadow-sm">
+                  <p className="text-gray-700 leading-relaxed text-sm sm:text-base">
+                    {user.about || "No bio available"}
+                  </p>
+                </div>
+                {isOwnProfile && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-full hover:bg-blue-100 h-8 w-8 sm:h-10 sm:w-10"
+                    onClick={() => setIsEditingAbout(true)}
+                  >
+                    <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Mobile-Optimized Tags Section */}
+          {tags.length > 0 && (
+            <div className="mt-4 sm:mt-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Tags</h3>
+                {isOwnProfile && (
+                  <Dialog open={isTagDialogOpen} onOpenChange={setIsTagDialogOpen}>
+                    <DialogTrigger asChild>
                       <Button
-                        variant="ghost"
-                        size="icon"
-                        className="opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-full hover:bg-indigo-100 hover:text-indigo-600 ml-4"
-                        onClick={() => setIsEditingAbout(true)}
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full border-blue-200 hover:bg-blue-50 text-xs sm:text-sm px-3"
                       >
-                        <Edit className="h-4 w-4" />
+                        <Edit className="h-3 w-3 mr-1" />
+                        Edit
                       </Button>
+                    </DialogTrigger>
+                    <DialogContent className="mx-4 sm:mx-auto sm:max-w-[600px] bg-background max-h-[80vh] overflow-y-auto rounded-2xl">
+                      <DialogHeader className="px-2 sm:px-0">
+                        <DialogTitle className="text-blue-600 text-lg">Edit Your Tags</DialogTitle>
+                        <DialogDescription className="text-sm">
+                          Update your interests, context, and intentions to help others connect with you.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-6 py-4 px-2 sm:px-0">
+                        <div>
+                          <h3 className="mb-2 text-base font-medium text-blue-600">Your Interests</h3>
+                          <TagSelector
+                            tags={availableTags}
+                            selectedTags={interestTags}
+                            onChange={setInterestTags}
+                            maxSelections={5}
+                            category="interest"
+                          />
+                        </div>
+
+                        <div>
+                          <h3 className="mb-2 text-base font-medium text-blue-600">Your Context</h3>
+                          <TagSelector
+                            tags={availableTags}
+                            selectedTags={contextTags}
+                            onChange={setContextTags}
+                            maxSelections={3}
+                            category="context"
+                          />
+                        </div>
+
+                        <div>
+                          <h3 className="mb-2 text-base font-medium text-blue-600">Your Intentions</h3>
+                          <TagSelector
+                            tags={availableTags}
+                            selectedTags={intentionTags}
+                            onChange={setIntentionTags}
+                            maxSelections={3}
+                            category="intention"
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter className="flex-col gap-2 mt-4 px-2 sm:px-0 sm:flex-row">
+                        <Button
+                          variant="outline"
+                          onClick={() => setIsTagDialogOpen(false)}
+                          className="rounded-full w-full sm:w-auto"
+                        >
+                          Cancel
+                        </Button>
+                        <Button onClick={handleSaveTags} className="rounded-full w-full sm:w-auto">
+                          Save Changes
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <span
+                    key={tag.tagId}
+                    className={cn(
+                      "rounded-full font-medium text-xs sm:text-sm px-3 py-1.5 sm:px-4 sm:py-2 transition-all hover:scale-105",
+                      getTagColor(tag.tagCategory),
                     )}
-                  </div>
-                </CardContent>
-              </Card>
+                  >
+                    {tag.tagName}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
         </div>
+      </div>
 
-        {/* Tags Section */}
-        {tags.length > 0 && (
-          <div className="mb-8">
-            <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-3xl overflow-hidden">
-              <CardContent className="p-6 sm:p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-indigo-500" />
-                    Tags
-                  </h3>
-                  {isOwnProfile && (
-                    <Dialog open={isTagDialogOpen} onOpenChange={setIsTagDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="rounded-full border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300 text-indigo-600 px-4 transition-all duration-300"
-                        >
-                          <Edit className="h-3 w-3 mr-2" />
-                          Edit Tags
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="mx-4 sm:mx-auto sm:max-w-[600px] bg-white/95 backdrop-blur-sm max-h-[80vh] overflow-y-auto rounded-3xl border-0 shadow-2xl">
-                        <DialogHeader className="px-2 sm:px-0">
-                          <DialogTitle className="text-indigo-600 text-xl flex items-center gap-2">
-                            <Sparkles className="h-5 w-5" />
-                            Edit Your Tags
-                          </DialogTitle>
-                          <DialogDescription className="text-gray-600">
-                            Update your interests, context, and intentions to help others connect with you.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-6 py-4 px-2 sm:px-0">
-                          <div>
-                            <h3 className="mb-3 text-base font-semibold text-indigo-600">Your Interests</h3>
-                            <TagSelector
-                              tags={availableTags}
-                              selectedTags={interestTags}
-                              onChange={setInterestTags}
-                              maxSelections={5}
-                              category="interest"
-                            />
-                          </div>
-
-                          <div>
-                            <h3 className="mb-3 text-base font-semibold text-emerald-600">Your Context</h3>
-                            <TagSelector
-                              tags={availableTags}
-                              selectedTags={contextTags}
-                              onChange={setContextTags}
-                              maxSelections={3}
-                              category="context"
-                            />
-                          </div>
-
-                          <div>
-                            <h3 className="mb-3 text-base font-semibold text-purple-600">Your Intentions</h3>
-                            <TagSelector
-                              tags={availableTags}
-                              selectedTags={intentionTags}
-                              onChange={setIntentionTags}
-                              maxSelections={3}
-                              category="intention"
-                            />
-                          </div>
-                        </div>
-                        <DialogFooter className="flex-col gap-3 mt-6 px-2 sm:px-0 sm:flex-row">
-                          <Button
-                            variant="outline"
-                            onClick={() => setIsTagDialogOpen(false)}
-                            className="rounded-full w-full sm:w-auto border-gray-300 hover:bg-gray-50"
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            onClick={handleSaveTags}
-                            className="rounded-full w-full sm:w-auto bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-                          >
-                            <Sparkles className="h-4 w-4 mr-2" />
-                            Save Changes
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  )}
+      {/* Followers Dialog */}
+      <Dialog open={isFollowersDialogOpen} onOpenChange={setIsFollowersDialogOpen}>
+        <DialogContent className="mx-4 sm:mx-auto sm:max-w-[400px] max-h-[80vh] overflow-y-auto rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-blue-600">Followers</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            {followers.length > 0 ? (
+              followers.map((follower) => (
+                <div key={follower.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg">
+                  <div className="relative h-10 w-10 overflow-hidden rounded-full">
+                    <Image
+                      src={follower.profileImage || follower.image || "/placeholder.svg?height=40&width=40"}
+                      alt={follower.username}
+                      fill
+                      className="object-cover"
+                      sizes="40px"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900">{follower.nickname || follower.username}</div>
+                    {follower.nickname && <div className="text-sm text-gray-500">@{follower.username}</div>}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => router.push(`/authenticated/profile/${follower.id}`)}
+                    className="rounded-full"
+                  >
+                    View
+                  </Button>
                 </div>
-                <div className="flex flex-wrap gap-3">
-                  {tags.map((tag) => (
-                    <span
-                      key={tag.tagId}
-                      className={cn(
-                        "rounded-full font-medium text-sm px-4 py-2 transition-all duration-300 hover:scale-105 hover:shadow-md border",
-                        getTagColor(tag.tagCategory),
-                      )}
-                    >
-                      {tag.tagName}
-                    </span>
-                  ))}
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">No followers yet</div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Following Dialog */}
+      <Dialog open={isFollowingDialogOpen} onOpenChange={setIsFollowingDialogOpen}>
+        <DialogContent className="mx-4 sm:mx-auto sm:max-w-[400px] max-h-[80vh] overflow-y-auto rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-blue-600">Following</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            {following.length > 0 ? (
+              following.map((followedUser) => (
+                <div key={followedUser.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg">
+                  <div className="relative h-10 w-10 overflow-hidden rounded-full">
+                    <Image
+                      src={followedUser.profileImage || followedUser.image || "/placeholder.svg?height=40&width=40"}
+                      alt={followedUser.username}
+                      fill
+                      className="object-cover"
+                      sizes="40px"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900">{followedUser.nickname || followedUser.username}</div>
+                    {followedUser.nickname && <div className="text-sm text-gray-500">@{followedUser.username}</div>}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => router.push(`/authenticated/profile/${followedUser.id}`)}
+                    className="rounded-full"
+                  >
+                    View
+                  </Button>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">Not following anyone yet</div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mobile-Optimized Content Tabs */}
+      <Tabs defaultValue="posts" className="w-full">
+        <TabsList className="grid w-full grid-cols-1 rounded-xl sm:rounded-2xl bg-blue-50 p-1 mb-6">
+          <TabsTrigger
+            value="posts"
+            className="rounded-lg sm:rounded-xl data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm font-medium text-sm sm:text-base py-2"
+          >
+            Posts
+            {postsLoading && <div className="ml-2 animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="posts" className="space-y-4 sm:space-y-6">
+          {/* Refresh button for posts */}
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-gray-900">
+              {isOwnProfile ? "Your Posts" : `${user.username}'s Posts`}
+            </h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefreshPosts}
+              disabled={postsLoading}
+              className="rounded-full"
+            >
+              <RefreshCw className={cn("h-4 w-4 mr-2", postsLoading && "animate-spin")} />
+              Refresh
+            </Button>
+          </div>
+
+          {/* Mobile-Optimized Post Creation Widget */}
+          {isOwnProfile && (
+            <Card className="rounded-xl sm:rounded-2xl border-blue-100 shadow-sm bg-gradient-to-br from-white to-blue-50/30">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex gap-3 sm:gap-4">
+                  <div className="relative h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 overflow-hidden rounded-full">
+                    <Image
+                      src={user.profileImage || user.image || "/placeholder.svg?height=48&width=48"}
+                      alt={user.username}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 640px) 40px, 48px"
+                    />
+                  </div>
+                  <div className="flex-1 space-y-3 sm:space-y-4">
+                    <div className="relative">
+                      <Textarea
+                        placeholder={`What's on your mind, ${user.nickname || user.username}?`}
+                        value={newPost}
+                        onChange={(e) => setNewPost(e.target.value)}
+                        className="min-h-[100px] sm:min-h-[120px] rounded-xl sm:rounded-2xl border-blue-200 bg-white/80 backdrop-blur-sm resize-none text-sm sm:text-lg placeholder:text-gray-400 focus:border-blue-400 focus:ring-blue-400/20"
+                      />
+                      <div className="absolute bottom-2 sm:bottom-3 right-2 sm:right-3 flex items-center gap-2">
+                        <span className="text-xs text-gray-400">{newPost.length}/500</span>
+                      </div>
+                    </div>
+
+                    {imagePreview && (
+                      <div className="relative rounded-xl sm:rounded-2xl overflow-hidden">
+                        <Image
+                          src={imagePreview || "/placeholder.svg"}
+                          alt="Post preview"
+                          width={400}
+                          height={300}
+                          className="w-full object-cover max-h-48 sm:max-h-64"
+                        />
+                        <Button
+                          size="icon"
+                          variant="destructive"
+                          className="absolute top-2 right-2 h-7 w-7 sm:h-8 sm:w-8 rounded-full text-lg"
+                          onClick={() => {
+                            setImagePreview(null)
+                            setImageFile(null)
+                          }}
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1 sm:gap-2">
+                        <ImageUpload onImageChange={handleImageChange} imagePreview={imagePreview} />
+                        <Button variant="ghost" size="sm" className="rounded-full hover:bg-blue-100 px-2 sm:px-3">
+                          <Smile className="h-4 w-4 mr-1 sm:mr-2" />
+                          <span className="hidden sm:inline text-sm">Emoji</span>
+                        </Button>
+                      </div>
+                      <Button
+                        onClick={handlePostSubmit}
+                        disabled={!newPost.trim() && !imagePreview}
+                        className="rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2 font-medium shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                      >
+                        <Send className="h-4 w-4 mr-1 sm:mr-2" />
+                        Share
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          </div>
-        )}
+          )}
 
-        {/* Content Tabs */}
-        <Tabs defaultValue="posts" className="w-full">
-          <TabsList className="grid w-full grid-cols-1 rounded-2xl bg-white/80 backdrop-blur-sm p-1 mb-8 shadow-lg border-0">
-            <TabsTrigger
-              value="posts"
-              className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg font-semibold text-base py-3 transition-all duration-300"
-            >
-              <div className="flex items-center gap-2">
-                Posts
-                {postsLoading && (
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent"></div>
-                )}
-              </div>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="posts" className="space-y-6">
-            {/* Posts Header */}
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-indigo-500" />
-                {isOwnProfile ? "Your Posts" : `${user.username}'s Posts`}
-              </h2>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefreshPosts}
-                disabled={postsLoading}
-                className="rounded-full border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300 text-indigo-600 transition-all duration-300"
-              >
-                <RefreshCw className={cn("h-4 w-4 mr-2", postsLoading && "animate-spin")} />
-                Refresh
-              </Button>
-            </div>
-
-            {/* Post Creation */}
-            {isOwnProfile && (
-              <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-3xl overflow-hidden">
-                <CardContent className="p-6">
-                  <div className="flex gap-4">
-                    <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-full">
-                      <Image
-                        src={user.profileImage || user.image || "/placeholder.svg?height=48&width=48"}
-                        alt={user.username}
-                        fill
-                        className="object-cover"
-                        sizes="48px"
-                      />
-                    </div>
-                    <div className="flex-1 space-y-4">
-                      <div className="relative">
-                        <Textarea
-                          placeholder={`What's on your mind, ${user.nickname || user.username}? ✨`}
-                          value={newPost}
-                          onChange={(e) => setNewPost(e.target.value)}
-                          className="min-h-[120px] rounded-2xl border-indigo-200 bg-white/50 backdrop-blur-sm resize-none text-base placeholder:text-gray-400 focus:border-indigo-400 focus:ring-indigo-400/20"
+          {/* Mobile-Optimized Posts */}
+          <div className="space-y-4 sm:space-y-6">
+            {posts.length > 0 ? (
+              posts.map((post) => (
+                <Card
+                  key={post.id}
+                  className="rounded-xl sm:rounded-2xl border-blue-100 shadow-sm hover:shadow-md transition-all bg-white"
+                >
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="flex gap-3 sm:gap-4">
+                      <div className="relative h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 overflow-hidden rounded-full">
+                        <Image
+                          src={user.profileImage || user.image || "/placeholder.svg?height=48&width=48"}
+                          alt={user.username}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 640px) 40px, 48px"
                         />
-                        <div className="absolute bottom-3 right-3 flex items-center gap-2">
-                          <span className="text-xs text-gray-400">{newPost.length}/500</span>
-                        </div>
                       </div>
-
-                      {imagePreview && (
-                        <div className="relative rounded-2xl overflow-hidden">
-                          <Image
-                            src={imagePreview || "/placeholder.svg"}
-                            alt="Post preview"
-                            width={400}
-                            height={300}
-                            className="w-full object-cover max-h-64"
-                          />
-                          <Button
-                            size="icon"
-                            variant="destructive"
-                            className="absolute top-3 right-3 h-8 w-8 rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
-                            onClick={() => {
-                              setImagePreview(null)
-                              setImageFile(null)
-                            }}
-                          >
-                            ×
-                          </Button>
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <ImageUpload onImageChange={handleImageChange} imagePreview={imagePreview} />
+                      <div className="flex-1 space-y-3 sm:space-y-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-semibold text-gray-900 text-sm sm:text-base">
+                                {user.nickname || user.username}
+                              </h3>
+                              <span className="text-xs sm:text-sm text-gray-500">@{user.username}</span>
+                            </div>
+                            <p className="text-xs sm:text-sm text-gray-500 mt-1">{formatDate(post.createdAt)}</p>
+                          </div>
                           <Button
                             variant="ghost"
-                            size="sm"
-                            className="rounded-full hover:bg-indigo-100 hover:text-indigo-600 px-3"
+                            size="icon"
+                            className="h-8 w-8 rounded-full hover:bg-gray-100 flex-shrink-0"
                           >
-                            <Smile className="h-4 w-4 mr-2" />
-                            <span className="hidden sm:inline text-sm">Emoji</span>
+                            <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </div>
-                        <Button
-                          onClick={handlePostSubmit}
-                          disabled={!newPost.trim() && !imagePreview}
-                          className="rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-6 py-2 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                        >
-                          <Send className="h-4 w-4 mr-2" />
-                          Share
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
 
-            {/* Posts */}
-            <div className="space-y-6">
-              {posts.length > 0 ? (
-                posts.map((post) => (
-                  <Card
-                    key={post.id}
-                    className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-3xl overflow-hidden hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
-                  >
-                    <CardContent className="p-6">
-                      <div className="flex gap-4">
-                        <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-full">
-                          <Image
-                            src={user.profileImage || user.image || "/placeholder.svg?height=48&width=48"}
-                            alt={user.username}
-                            fill
-                            className="object-cover"
-                            sizes="48px"
-                          />
-                        </div>
-                        <div className="flex-1 space-y-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="font-bold text-gray-900 text-base">{user.nickname || user.username}</h3>
-                                <span className="text-sm text-gray-500">@{user.username}</span>
-                              </div>
-                              <p className="text-sm text-gray-500 mt-1">{formatDate(post.createdAt)}</p>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 rounded-full hover:bg-gray-100 flex-shrink-0"
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
+                        <p className="text-gray-800 leading-relaxed text-sm sm:text-base">{post.content}</p>
+
+                        {post.image && (
+                          <div className="rounded-xl sm:rounded-2xl overflow-hidden -mx-1 sm:mx-0">
+                            <Image
+                              src={post.image || "/placeholder.svg"}
+                              alt="Post image"
+                              width={500}
+                              height={300}
+                              className="w-full object-cover max-h-64 sm:max-h-80"
+                            />
                           </div>
+                        )}
 
-                          <p className="text-gray-800 leading-relaxed text-base">{post.content}</p>
-
-                          {post.image && (
-                            <div className="rounded-2xl overflow-hidden">
-                              <Image
-                                src={post.image || "/placeholder.svg"}
-                                alt="Post image"
-                                width={500}
-                                height={300}
-                                className="w-full object-cover max-h-80"
-                              />
-                            </div>
-                          )}
-
-                          <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                            <div className="flex items-center gap-6">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleLikePost(post.id)}
-                                className={cn(
-                                  "flex items-center gap-2 rounded-full transition-all duration-300 px-3 py-2 hover:scale-105",
-                                  post.isLiked ? "text-red-500 hover:bg-red-50" : "hover:bg-red-50 hover:text-red-500",
-                                )}
-                              >
-                                <Heart className={cn("h-5 w-5", post.isLiked && "fill-current")} />
-                                <span className="font-semibold">{post.likes}</span>
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="flex items-center gap-2 rounded-full hover:bg-blue-50 hover:text-blue-600 transition-all duration-300 px-3 py-2 hover:scale-105"
-                              >
-                                <MessageCircle className="h-5 w-5" />
-                                <span className="font-semibold">{post.comments}</span>
-                              </Button>
-                            </div>
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                          <div className="flex items-center gap-4 sm:gap-6">
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="rounded-full hover:bg-indigo-50 hover:text-indigo-600 transition-all duration-300 p-2 hover:scale-105"
+                              onClick={() => handleLikePost(post.id)}
+                              className={cn(
+                                "flex items-center gap-1.5 sm:gap-2 rounded-full transition-colors px-2 sm:px-3 py-1.5 sm:py-2 -ml-2 sm:-ml-3",
+                                post.isLiked ? "text-red-600 hover:bg-red-50" : "hover:bg-red-50 hover:text-red-600",
+                              )}
                             >
-                              <Share2 className="h-5 w-5" />
+                              <Heart className={cn("h-4 w-4 sm:h-5 sm:w-5", post.isLiked && "fill-current")} />
+                              <span className="font-medium text-sm">{post.likes}</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="flex items-center gap-1.5 sm:gap-2 rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors px-2 sm:px-3 py-1.5 sm:py-2"
+                            >
+                              <MessageCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                              <span className="font-medium text-sm">{post.comments}</span>
                             </Button>
                           </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors p-1.5 sm:p-2"
+                          >
+                            <Share2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                          </Button>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))
-              ) : (
-                <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-3xl overflow-hidden">
-                  <CardContent className="p-12 text-center">
-                    <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
-                      <Sparkles className="w-8 h-8 text-indigo-500" />
                     </div>
-                    <h3 className="text-xl font-bold text-gray-800 mb-2">
-                      {isOwnProfile ? "Share your first post!" : "No posts yet"}
-                    </h3>
-                    <p className="text-gray-600">
-                      {isOwnProfile
-                        ? "Start sharing your thoughts and connect with others! ✨"
-                        : "This user hasn't shared anything yet."}
-                    </p>
                   </CardContent>
                 </Card>
-              )}
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
+              ))
+            ) : (
+              <div className="text-center py-8 sm:py-12 text-gray-500">
+                <div className="text-sm sm:text-base">
+                  {isOwnProfile ? "You haven't posted anything yet." : "No posts to show."}
+                </div>
+                {isOwnProfile && (
+                  <p className="text-xs sm:text-sm mt-2 text-gray-400">Share your first post to get started!</p>
+                )}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

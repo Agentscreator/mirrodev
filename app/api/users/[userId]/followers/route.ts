@@ -1,69 +1,38 @@
-// app/api/users/[userId]/followers/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/src/lib/auth';
-import { db } from '@/src/db';
-import { followersTable, usersTable } from '@/src/db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { type NextRequest, NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/src/lib/auth"
+import { db } from "@/src/db"
+import { usersTable, followersTable } from "@/src/db/schema"
+import { eq } from "drizzle-orm"
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { userId: string } }
-) {
+export async function GET(request: NextRequest, { params }: { params: { userId: string } }) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { userId } = params;
-    const followers = await getFollowers(userId, session.user.id);
-    
-    return NextResponse.json({ users: followers });
-  } catch (error) {
-    console.error('Error fetching followers:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch followers' },
-      { status: 500 }
-    );
-  }
-}
+    const userId = params.userId
 
-async function getFollowers(userId: string, currentUserId: string) {
-  // Get all followers of the user
-  const followersQuery = await db
-    .select({
-      id: usersTable.id,
-      username: usersTable.username,
-      nickname: usersTable.nickname,
-      profileImage: usersTable.profileImage,
-      image: usersTable.image,
-      metro_area: usersTable.metro_area,
+    // Get followers
+    const followers = await db
+      .select({
+        id: usersTable.id,
+        username: usersTable.username,
+        nickname: usersTable.nickname,
+        profileImage: usersTable.profileImage,
+        image: usersTable.image,
+      })
+      .from(followersTable)
+      .innerJoin(usersTable, eq(followersTable.followerId, usersTable.id))
+      .where(eq(followersTable.followingId, userId))
+
+    return NextResponse.json({
+      followers,
+      success: true,
     })
-    .from(followersTable)
-    .innerJoin(usersTable, eq(followersTable.followerId, usersTable.id))
-    .where(eq(followersTable.followingId, userId));
-
-  if (followersQuery.length === 0) {
-    return [];
+  } catch (error) {
+    console.error("Error fetching followers:", error)
+    return NextResponse.json({ error: "Failed to fetch followers" }, { status: 500 })
   }
-
-  // Get who the current user is following among these followers
-  const followerIds = followersQuery.map(f => f.id);
-  const currentUserFollowing = await db
-    .select({ followingId: followersTable.followingId })
-    .from(followersTable)
-    .where(
-      and(
-        eq(followersTable.followerId, currentUserId),
-        inArray(followersTable.followingId, followerIds)
-      )
-    );
-
-  const followingSet = new Set(currentUserFollowing.map(f => f.followingId));
-
-  return followersQuery.map(follower => ({
-    ...follower,
-    isFollowing: followingSet.has(follower.id)
-  }));
 }
-

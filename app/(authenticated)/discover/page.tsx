@@ -6,19 +6,20 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { UserCard } from "@/components/user-card"
 import { TypingAnimation } from "@/components/typing-animation"
-import { RecommendedUser } from "@/src/lib/recommendationService"
+import type { RecommendedUser } from "@/src/lib/recommendationService"
 import { fetchRecommendations, generateExplanation } from "@/src/lib/apiServices"
 import type { RecommendedUser as ApiRecommendedUser } from "@/src/lib/apiServices"
 import { useRouter } from "next/navigation"
 import { debounce } from "lodash"
 import { useStreamContext } from "@/components/providers/StreamProvider"
-import { toast } from "sonner" // Add this for notifications
+import { toast } from "@/hooks/use-toast"
 
 // Define search user type
 interface SearchUser {
-  id: string;
-  username: string;
-  nickname?: string;
+  id: string
+  username: string
+  nickname?: string
+  image?: string
 }
 
 export default function DiscoverPage() {
@@ -73,7 +74,7 @@ export default function DiscoverPage() {
   // Debounced search function
   const debouncedSearch = useCallback(
     debounce((query: string) => searchUsers(query), 300),
-    []
+    [],
   )
 
   // Handle search input change
@@ -107,7 +108,11 @@ export default function DiscoverPage() {
   // Start conversation with user - FIXED
   const handleMessage = async (userId: string) => {
     if (!streamClient || !isReady) {
-      toast.error("Chat is not ready. Please wait a moment and try again.")
+      toast({
+        title: "Error",
+        description: "Chat is not ready. Please wait a moment and try again.",
+        variant: "destructive",
+      })
       return
     }
 
@@ -115,14 +120,14 @@ export default function DiscoverPage() {
 
     try {
       // Create/get channel via API
-      const response = await fetch('/api/stream/channel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/stream/channel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ recipientId: userId }),
       })
-      
+
       if (!response.ok) {
-        throw new Error('Failed to create channel')
+        throw new Error("Failed to create channel")
       }
 
       const { channelId } = await response.json()
@@ -131,7 +136,11 @@ export default function DiscoverPage() {
       router.push(`/authenticated/messages/${userId}`)
     } catch (error) {
       console.error("Error creating channel:", error)
-      toast.error("Failed to start conversation. Please try again.")
+      toast({
+        title: "Error",
+        description: "Failed to start conversation. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setMessagingUser(null)
     }
@@ -164,9 +173,7 @@ export default function DiscoverPage() {
   }, [])
 
   // Filter users based on search query
-  const filteredUsers = users.filter((user) => 
-    user.username.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredUsers = users.filter((user) => user.username.toLowerCase().includes(searchQuery.toLowerCase()))
 
   // Load more recommendations
   const loadMore = async () => {
@@ -178,13 +185,13 @@ export default function DiscoverPage() {
       const usersWithReasons = [...users]
 
       for (const newUser of newUsers) {
-        let userId: number = -1
-        if (typeof newUser.id === 'string') {
-          const parsed = parseInt(newUser.id, 10)
+        let userId = -1
+        if (typeof newUser.id === "string") {
+          const parsed = Number.parseInt(newUser.id, 10)
           if (!isNaN(parsed)) {
             userId = parsed
           }
-        } else if (typeof newUser.id === 'number') {
+        } else if (typeof newUser.id === "number") {
           userId = newUser.id
         }
 
@@ -211,7 +218,11 @@ export default function DiscoverPage() {
   }
 
   if (loading) {
-    return <div className="flex justify-center py-12"><TypingAnimation /></div>
+    return (
+      <div className="flex justify-center py-12">
+        <TypingAnimation />
+      </div>
+    )
   }
 
   return (
@@ -228,7 +239,7 @@ export default function DiscoverPage() {
           onFocus={handleSearchFocus}
           onBlur={handleSearchBlur}
         />
-        
+
         {/* Search Results Dropdown */}
         {showSearchResults && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-blue-200 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
@@ -244,11 +255,24 @@ export default function DiscoverPage() {
                     className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
                   >
                     <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium text-gray-900">{user.username}</div>
-                        {user.nickname && (
-                          <div className="text-sm text-gray-500">{user.nickname}</div>
-                        )}
+                      <div className="flex items-center gap-3">
+                        <div className="relative h-8 w-8 overflow-hidden rounded-full">
+                          {user.image ? (
+                            <img
+                              src={user.image || "/placeholder.svg"}
+                              alt={user.username}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-blue-500 flex items-center justify-center text-white text-xs font-semibold">
+                              {user.username[0]?.toUpperCase() || "?"}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900">{user.username}</div>
+                          {user.nickname && <div className="text-sm text-gray-500">{user.nickname}</div>}
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <Button
@@ -279,9 +303,7 @@ export default function DiscoverPage() {
                 ))}
               </div>
             ) : (
-              <div className="p-4 text-center text-gray-500">
-                No users found
-              </div>
+              <div className="p-4 text-center text-gray-500">No users found</div>
             )}
           </div>
         )}
@@ -292,8 +314,8 @@ export default function DiscoverPage() {
           <>
             {filteredUsers.length > 0 ? (
               filteredUsers.map((user) => (
-                <UserCard 
-                  key={user.id} 
+                <UserCard
+                  key={user.id}
                   user={{
                     id: user.id,
                     username: user.username,
@@ -307,16 +329,14 @@ export default function DiscoverPage() {
                 />
               ))
             ) : (
-              <div className="text-center py-8 text-gray-500">
-                No matching users found
-              </div>
+              <div className="text-center py-8 text-gray-500">No matching users found</div>
             )}
 
             {hasMore && (
               <div className="flex justify-center pt-2">
-                <Button 
-                  onClick={loadMore} 
-                  variant="outline" 
+                <Button
+                  onClick={loadMore}
+                  variant="outline"
                   className="rounded-full border-blue-200 hover:bg-blue-50"
                   disabled={loadingMore}
                 >
@@ -324,11 +344,9 @@ export default function DiscoverPage() {
                 </Button>
               </div>
             )}
-            
+
             {explanationLoading !== -1 && (
-              <div className="text-center text-sm text-gray-500">
-                Generating connection explanation...
-              </div>
+              <div className="text-center text-sm text-gray-500">Generating connection explanation...</div>
             )}
           </>
         )}

@@ -5,10 +5,10 @@ import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
-import { Channel, ChannelHeader, MessageInput, MessageList, Thread, Window } from 'stream-chat-react'
-import { useStreamContext } from '@/components/providers/StreamProvider'
-import type { Channel as StreamChannel } from 'stream-chat'
-import 'stream-chat-react/dist/css/v2/index.css'
+import { Channel, MessageInput, MessageList, Thread, Window } from "stream-chat-react"
+import { useStreamContext } from "@/components/providers/StreamProvider"
+import type { Channel as StreamChannel } from "stream-chat"
+import "stream-chat-react/dist/css/v2/index.css"
 
 interface User {
   id: string
@@ -32,7 +32,7 @@ export default function UserMessagePage() {
     const initializeChat = async () => {
       if (!streamClient || !isReady || !userId) {
         if (streamError) {
-          setError('Chat service unavailable')
+          setError("Chat service unavailable")
         }
         return
       }
@@ -49,36 +49,36 @@ export default function UserMessagePage() {
             id: userData.user.id,
             username: userData.user.username,
             nickname: userData.user.nickname,
-            image: userData.user.image || userData.user.profileImage
+            image: userData.user.image || userData.user.profileImage,
           })
         } else if (userResponse.status === 404) {
-          setError('User not found')
+          setError("User not found")
           return
         } else {
-          throw new Error('Failed to fetch user data')
+          throw new Error("Failed to fetch user data")
         }
 
         // Create or get existing channel via API
-        const channelResponse = await fetch('/api/stream/channel', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const channelResponse = await fetch("/api/stream/channel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ recipientId: userId }),
         })
 
         if (!channelResponse.ok) {
-          throw new Error('Failed to create channel')
+          throw new Error("Failed to create channel")
         }
 
         const { channelId } = await channelResponse.json()
 
         // Get the channel from Stream client
-        const streamChannel = streamClient.channel('messaging', channelId)
+        const streamChannel = streamClient.channel("messaging", channelId)
         await streamChannel.watch()
-        
+
         setChannel(streamChannel)
       } catch (err) {
-        console.error('Chat initialization error:', err)
-        setError(err instanceof Error ? err.message : 'Failed to load conversation')
+        console.error("Chat initialization error:", err)
+        setError(err instanceof Error ? err.message : "Failed to load conversation")
       } finally {
         setLoading(false)
       }
@@ -89,7 +89,7 @@ export default function UserMessagePage() {
 
   if (loading) {
     return (
-      <div className="flex h-[calc(100vh-5rem)] md:h-[calc(100vh-4rem)] items-center justify-center messages-doodle-bg">
+      <div className="flex h-[calc(100vh-5rem)] md:h-[calc(100vh-4rem)] items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading conversation...</p>
@@ -100,17 +100,17 @@ export default function UserMessagePage() {
 
   if (error) {
     return (
-      <div className="flex h-[calc(100vh-5rem)] md:h-[calc(100vh-4rem)] items-center justify-center messages-doodle-bg">
+      <div className="flex h-[calc(100vh-5rem)] md:h-[calc(100vh-4rem)] items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-red-600 mb-2">{error}</h2>
           <p className="text-gray-600 mb-4">
-            {error === 'User not found' 
-              ? 'This user doesn\'t exist or has been removed.' 
-              : 'Unable to load this conversation.'}
+            {error === "User not found"
+              ? "This user doesn't exist or has been removed."
+              : "Unable to load this conversation."}
           </p>
-          <Button 
-            className="rounded-full" 
-            onClick={() => router.push('/authenticated/messages')}
+          <Button
+            className="rounded-full bg-blue-600 hover:bg-blue-700"
+            onClick={() => router.push("/authenticated/messages")}
           >
             Back to Messages
           </Button>
@@ -121,7 +121,7 @@ export default function UserMessagePage() {
 
   if (!channel || !user) {
     return (
-      <div className="flex h-[calc(100vh-5rem)] md:h-[calc(100vh-4rem)] items-center justify-center messages-doodle-bg">
+      <div className="flex h-[calc(100vh-5rem)] md:h-[calc(100vh-4rem)] items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-blue-600">Loading...</h2>
           <p className="mt-2 text-gray-600">Setting up your conversation...</p>
@@ -131,22 +131,22 @@ export default function UserMessagePage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-5rem)] md:h-[calc(100vh-4rem)] flex-col messages-doodle-bg">
+    <div className="flex h-[calc(100vh-5rem)] md:h-[calc(100vh-4rem)] flex-col bg-gradient-to-br from-blue-50 via-white to-blue-50">
       {/* Custom Header */}
-      <div className="border-b glass-effect p-4">
+      <div className="border-b bg-white/80 backdrop-blur-sm p-4 shadow-sm">
         <div className="flex items-center gap-3">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="rounded-full mr-1" 
-            onClick={() => router.push('/authenticated/messages')}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full mr-1 hover:bg-blue-100"
+            onClick={() => router.push("/authenticated/messages")}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="relative h-10 w-10 overflow-hidden rounded-full premium-avatar">
+          <div className="relative h-10 w-10 overflow-hidden rounded-full border-2 border-blue-200">
             {user.image ? (
               <Image
-                src={user.image}
+                src={user.image || "/placeholder.svg"}
                 alt={user.username}
                 fill
                 className="object-cover"
@@ -154,17 +154,13 @@ export default function UserMessagePage() {
               />
             ) : (
               <div className="w-full h-full bg-blue-500 flex items-center justify-center text-white font-semibold">
-                {user.username[0]?.toUpperCase() || '?'}
+                {user.username[0]?.toUpperCase() || "?"}
               </div>
             )}
           </div>
           <div className="flex-1">
-            <h3 className="font-medium text-blue-600">
-              {user.nickname || user.username}
-            </h3>
-            <p className="text-xs premium-text-muted">
-              {user.nickname ? `@${user.username}` : 'Online'}
-            </p>
+            <h3 className="font-medium text-blue-600">{user.nickname || user.username}</h3>
+            <p className="text-xs text-gray-500">{user.nickname ? `@${user.username}` : "Online"}</p>
           </div>
         </div>
       </div>
@@ -173,9 +169,9 @@ export default function UserMessagePage() {
       <div className="flex-1 flex stream-chat-custom">
         <Channel channel={channel}>
           <Window>
-            <div className="str-chat__main-panel" style={{ height: '100%' }}>
+            <div className="str-chat__main-panel" style={{ height: "100%" }}>
               <MessageList />
-              <div className="border-t glass-effect p-4">
+              <div className="border-t bg-white/80 backdrop-blur-sm p-4">
                 <MessageInput />
               </div>
             </div>
