@@ -47,29 +47,43 @@ export default function DiscoverPage() {
     score: (apiUser as any).score ?? 0,
   })
 
-  // Search users function
-  const searchUsers = async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([])
-      setShowSearchResults(false)
-      return
-    }
-
-    setSearchLoading(true)
-    try {
-      const response = await fetch(`/api/users/search?q=${encodeURIComponent(query)}&limit=10`)
-      if (response.ok) {
-        const data = await response.json()
-        setSearchResults(data.users)
-        setShowSearchResults(true)
-      }
-    } catch (error) {
-      console.error("Search error:", error)
-      setSearchResults([])
-    } finally {
-      setSearchLoading(false)
-    }
+ // Search users function
+const searchUsers = async (query: string) => {
+  if (!query.trim()) {
+    setSearchResults([]);
+    setShowSearchResults(false);
+    return;
   }
+
+  setSearchLoading(true);
+  try {
+    const response = await fetch(
+      `/api/users/search?q=${encodeURIComponent(query)}&limit=10`,
+      {
+        method: "GET",
+        // include the NextAuth cookie so getServerSession() can authenticate
+        credentials: "include",
+      }
+    );
+
+    if (response.ok) {
+      const { users } = await response.json();
+      setSearchResults(users);
+      setShowSearchResults(true);
+    } else {
+      // optionally handle 401/other statuses if you want
+      console.warn("Search returned status", response.status);
+      setSearchResults([]);
+      setShowSearchResults(false);
+    }
+  } catch (error) {
+    console.error("Search error:", error);
+    setSearchResults([]);
+    setShowSearchResults(false);
+  } finally {
+    setSearchLoading(false);
+  }
+}
 
   // Debounced search function
   const debouncedSearch = useCallback(
@@ -103,7 +117,7 @@ export default function DiscoverPage() {
   // Navigate to user profile - FIXED
   const handleViewProfile = (userId: string) => {
     setShowSearchResults(false) // Hide search results when navigating
-    router.push(`/authenticated/profile/${userId}`)
+    router.push(`/profile/${userId}`)
   }
 
   // Start conversation with user - FIXED
